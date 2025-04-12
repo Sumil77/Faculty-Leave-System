@@ -5,7 +5,8 @@ import Dashboard from "../pages/Dashboard";
 import ApplyLeave from "../pages/ApplyLeave";
 import LeaveStatus from "../pages/LeaveStatus";
 import AdminPanel from "../pages/AdminPanel";
-import HolidayCalendar from "../pages/HolidayCalendar";  // ✅ Import the HolidayCalendar component
+import HolidayCalendar from "../pages/HolidayCalendar";
+import LeaveInfo from "../pages/LeaveInfo";
 
 const AppRoutes = () => {
   return (
@@ -16,7 +17,8 @@ const AppRoutes = () => {
       <Route path="/apply-leave" element={<ApplyLeave />} />
       <Route path="/leave-status" element={<LeaveStatus />} />
       <Route path="/admin-panel" element={<AdminPanel />} />
-      <Route path="/holiday-calendar" element={<HolidayCalendar />} />  
+      <Route path="/holiday-calendar" element={<HolidayCalendar />} />
+      <Route path="/leave-info" element={<LeaveInfo />} /> 
     </Routes>
   );
 };
