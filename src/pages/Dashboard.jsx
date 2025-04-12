@@ -124,6 +124,9 @@ const Dashboard = () => {
 
   return (
     <div className="min-h-screen bg-gray-100 p-6">
+      {/* Dashboard Heading */}
+      <h2 className="text-3xl font-bold text-gray-800 mb-6 flex justify-center pb-10">Faculty Dashboard</h2>
+
       <div className="flex flex-col lg:flex-row gap-6 justify-between items-start">
         {/* Past Leaves Table */}
         <div className="bg-white shadow-lg rounded-lg p-6 w-full lg:w-[650px]">
@@ -192,7 +195,7 @@ const Dashboard = () => {
         </div>
 
         {/* ID Card */}
-        <div className="lg:ml-auto">
+        <div className="lg:ml-auto mt-6 lg:mt-0">
           <IDCard faculty={facultyData} />
         </div>
       </div>

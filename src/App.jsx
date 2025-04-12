@@ -1,12 +1,9 @@
-import { BrowserRouter as Router, Route, Routes } from "react-router-dom";
+import { BrowserRouter as Router } from "react-router-dom";
 import Navbar from "./components/Navbar";
 import Sidebar from "./components/Sidebar";
 import LeaveBalance from "./components/LeaveBalance";
-import Home from "./pages/Home";
-import Login from "./pages/Login";
-import Dashboard from "./pages/Dashboard";
 import Footer from "./components/Footer";
-import HolidayCalendar from "./pages/HolidayCalendar";
+import AppRoutes from "./routes/AppRoutes";  // Import your AppRoutes component
 
 function App() {
   return (
@@ -18,7 +15,7 @@ function App() {
           <div className="h-[300px] overflow-hidden"> {/* ✅ Fixed shorter height */}
             <Sidebar />
           </div>
-          
+
           {/* ✅ Leave Balance stays below but does NOT increase Sidebar height */}
           <div className="mt-4">
             <LeaveBalance />
@@ -27,12 +24,8 @@ function App() {
 
         {/* Main Content Section */}
         <div className="flex-1 p-5">
-          <Routes>
-            <Route path="/" element={<Home />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/holiday-calendar" element={<HolidayCalendar />} /> 
-          </Routes>
+          {/* Use AppRoutes to handle routes */}
+          <AppRoutes />  {/* This will render all the routes you defined in AppRoutes.jsx */}
         </div>
       </div>
       <Footer />
