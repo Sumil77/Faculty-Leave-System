@@ -1,4 +1,6 @@
 import { useState, useEffect } from "react";
+import TypeOfLeaveImg from '../assets/Leaves.png';
+
 
 const ApplyLeave = () => {
   const [showForm, setShowForm] = useState(false);
@@ -220,6 +222,19 @@ const ApplyLeave = () => {
           Cancel Leave
         </button>
       </div>
+      {!showForm && !submittedLeave && (
+  <div className="flex justify-center mt-6">
+    <img
+      src={TypeOfLeaveImg}
+      alt="Types of Leave"
+      className="max-w-full md:max-w-2xl h-auto rounded-xl shadow-lg"
+    />
+  </div>
+)}
+
+
+
+
 
       {showForm && (
         <form
@@ -365,52 +380,52 @@ const ApplyLeave = () => {
 
       {/* Display Submitted Leave Info */}
       {submittedLeave && (
-  <div className="mt-8 bg-white p-6 rounded-2xl shadow-xl space-y-6 max-w-lg mx-auto">
-    <h3 className="text-2xl font-bold text-blue-800 flex items-center gap-2">
-      <span>✅</span> <span>Submitted Leave:</span>
-    </h3>
-    <div className="space-y-2">
-      <p className="text-lg font-medium">
-        <span role="img" aria-label="Leave Type" className="mr-2">🌴</span>
-        Leave Type: <strong>{submittedLeave.type}</strong>
-      </p>
-      <p className="text-lg font-medium">
-        <span role="img" aria-label="Leave Duration" className="mr-2">⏳</span>
-        Leave Duration: <strong>{submittedLeave.duration}</strong>
-      </p>
-      <p className="text-lg font-medium">
-        <span role="img" aria-label="Reason" className="mr-2">📝</span>
-        Leave Reason: <strong>{submittedLeave.reason}</strong>
-      </p>
-      <p className="text-lg font-medium">
-        <span role="img" aria-label="From" className="mr-2">📅</span>
-        From: <strong>{submittedLeave.from}</strong>
-      </p>
-      <p className="text-lg font-medium">
-        <span role="img" aria-label="To" className="mr-2">📅</span>
-        To: <strong>{submittedLeave.to}</strong>
-      </p>
-      {/* Conditionally render Time only if it's NOT Full Day */}
-      {submittedLeave.duration !== "Full Day" && (
-        <>
-          <p className="text-lg font-medium">
-            <span role="img" aria-label="Leave Time" className="mr-2">⏰</span>
-            Leave Time: <strong>{`${timeFrom} - ${timeTo}`}</strong>
-          </p>
-        </>
-      )}
-      <p className="text-lg font-medium">
-        <span role="img" aria-label="Total Leave" className="mr-2">📊</span>
-        Total Leave: <strong>{submittedLeave.totalDays} day(s)</strong>
-      </p>
-    </div>
+        <div className="mt-8 bg-white p-6 rounded-2xl shadow-xl space-y-6 max-w-lg mx-auto">
+          <h3 className="text-2xl font-bold text-blue-800 flex items-center gap-2">
+            <span>✅</span> <span>Submitted Leave:</span>
+          </h3>
+          <div className="space-y-2">
+            <p className="text-lg font-medium">
+              <span role="img" aria-label="Leave Type" className="mr-2">🌴</span>
+              Leave Type: <strong>{submittedLeave.type}</strong>
+            </p>
+            <p className="text-lg font-medium">
+              <span role="img" aria-label="Leave Duration" className="mr-2">⏳</span>
+              Leave Duration: <strong>{submittedLeave.duration}</strong>
+            </p>
+            <p className="text-lg font-medium">
+              <span role="img" aria-label="Reason" className="mr-2">📝</span>
+              Leave Reason: <strong>{submittedLeave.reason}</strong>
+            </p>
+            <p className="text-lg font-medium">
+              <span role="img" aria-label="From" className="mr-2">📅</span>
+              From: <strong>{submittedLeave.from}</strong>
+            </p>
+            <p className="text-lg font-medium">
+              <span role="img" aria-label="To" className="mr-2">📅</span>
+              To: <strong>{submittedLeave.to}</strong>
+            </p>
+            {/* Conditionally render Time only if it's NOT Full Day */}
+            {submittedLeave.duration !== "Full Day" && (
+              <>
+                <p className="text-lg font-medium">
+                  <span role="img" aria-label="Leave Time" className="mr-2">⏰</span>
+                  Leave Time: <strong>{`${timeFrom} - ${timeTo}`}</strong>
+                </p>
+              </>
+            )}
+            <p className="text-lg font-medium">
+              <span role="img" aria-label="Total Leave" className="mr-2">📊</span>
+              Total Leave: <strong>{submittedLeave.totalDays} day(s)</strong>
+            </p>
+          </div>
 
-    {/* Fun Emoji */}
-    <div className="flex justify-center">
-      <span role="img" aria-label="Happy" className="text-4xl">🎉</span>
-    </div>
-  </div>
-)}
+          {/* Fun Emoji */}
+          <div className="flex justify-center">
+            <span role="img" aria-label="Happy" className="text-4xl">🎉</span>
+          </div>
+        </div>
+      )}
 
 
     </div>
