@@ -223,14 +223,14 @@ const ApplyLeave = () => {
         </button>
       </div>
       {!showForm && !submittedLeave && (
-  <div className="flex justify-center mt-6">
-    <img
-      src={TypeOfLeaveImg}
-      alt="Types of Leave"
-      className="max-w-full md:max-w-2xl h-auto rounded-xl shadow-lg"
-    />
-  </div>
-)}
+        <div className="flex justify-center mt-6">
+          <img
+            src={TypeOfLeaveImg}
+            alt="Types of Leave"
+            className="max-w-full md:max-w-2xl h-auto rounded-xl shadow-lg"
+          />
+        </div>
+      )}
 
 
 
