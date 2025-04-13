@@ -6,7 +6,7 @@ export default defineConfig({
   plugins: [react()],
   server: {
     host: '0.0.0.0',
-    port: 5173,
+    port: 3001,
     strictPort: true,
     allowedHosts: [
       '0822-38-254-174-96.ngrok-free.app', // Your specific Ngrok URL
