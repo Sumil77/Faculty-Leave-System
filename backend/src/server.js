@@ -1,7 +1,64 @@
-import express from 'express';
-import { PORT, NODE_ENV } from './config';
-const app = express();
-app.disable('x-powered-by');
-app.use(express.urlencoded({ extended: true }));
-app.use(express.json());
-app.listen(PORT, () => console.log(`Listening on port ${PORT}`));
+// server.js
+import express from "express";
+import { userRoutes , sessionRoutes} from "./routes/index.js";
+import session from "express-session";
+import pgSession from "connect-pg-simple";
+import { PORT, NODE_ENV, sequelize,SESS_NAME, SESS_SECRET, SESS_LIFETIME,  DB_HOST,
+    DB_USER,
+    DB_PASS,
+    DB_NAME,
+    DB_PORT, } from "./config.js";
+import pkg from 'pg';
+const { Pool } = pkg;
+
+const PgSession = pgSession(session);
+const pgPool = new Pool({
+  host: DB_HOST,
+  user: DB_USER,
+  password: DB_PASS,
+  database: DB_NAME,
+  port: DB_PORT || 5432,
+});
+
+
+(async () => {
+  try {
+    await sequelize.authenticate();
+    console.log("PostgreSQL connected");
+    await sequelize.sync({ force: true });
+    const app = express();
+    app.disable("x-powered-by");
+    app.use(express.urlencoded({ extended: true }));
+    app.use(express.json());
+    app.use(
+        session({
+          name: SESS_NAME,
+          secret: SESS_SECRET,
+          saveUninitialized: false,
+          resave: false,
+          store: new PgSession({
+            pool: pgPool,
+            tableName: "session",
+            ttl: parseInt(SESS_LIFETIME) / 1000,
+            createTableIfMissing: true
+          }),
+          cookie: {
+            sameSite: true,
+            secure: NODE_ENV === "production",
+            maxAge: parseInt(SESS_LIFETIME),
+          },
+        })
+    );
+
+    // Export the app before listening
+    const apiRouter = express.Router();
+    app.use("/api", apiRouter);
+    apiRouter.use("/users", userRoutes);
+    apiRouter.use('/session', sessionRoutes);
+
+    // Start server (optional - could move to index.js)
+    app.listen(PORT, () => console.log(`Listening on port ${PORT}`));
+  } catch (err) {
+    console.log(err);
+  }
+})();
