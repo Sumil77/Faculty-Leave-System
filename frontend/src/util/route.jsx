@@ -3,11 +3,13 @@ import { useSelector, useDispatch } from "react-redux";
 import { Navigate, useLocation, Outlet } from "react-router-dom";
 import { logout , receiveCurrentUser } from "../actions/session";
 
+const isBypassAuth = import.meta.env.VITE_BYPASS_AUTH ;
+
 export const AuthRoute = ({ children }) => {
   const loggedIn = useSelector((state) => Boolean(state.session.userId));
   const location = useLocation();
 
-  if (loggedIn) {
+  if (loggedIn && !isBypassAuth) {
     return <Navigate to="/dashboard" state={{ from: location }} replace />;
   }
 
@@ -25,6 +27,12 @@ export const ProtectedRoute = ({ children }) => {
   let idleTimer;
 
   const validateSession = async () => {
+    console.log(isBypassAuth);
+    
+    if (isBypassAuth) {
+      setChecking(false);
+      return;
+    }
     try {
       const res = await fetch("/api/session", {
         credentials: "include", // send cookies
@@ -73,6 +81,8 @@ export const ProtectedRoute = ({ children }) => {
   if (checking) return <div>Loading...</div>;
 
   if (!loggedIn) {
+    console.log(loggedIn);
+    
     return <Navigate to="/login" replace />;
   }
 

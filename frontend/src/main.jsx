@@ -5,9 +5,16 @@ import configureStore from './store/store';
 import { Provider } from "react-redux";
 import "./styles/index.css";
 import { BrowserRouter } from "react-router-dom";
-import { checkLoggedIn } from "./util/session";
+import combineReducers from "./reducers/root.js"
+// import { checkLoggedIn } from "./util/session";
+const isBypassAuth = import.meta.env.VITE_BYPASS_AUTH;
 
-const store = configureStore();
+const mockSession = {
+    userId: "mock123",
+    username: "DevUser",
+};
+
+const store = configureStore(isBypassAuth ? undefined: {session : mockSession});
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <BrowserRouter>
@@ -16,3 +23,4 @@ ReactDOM.createRoot(document.getElementById("root")).render(
     </Provider>
   </BrowserRouter>
 );
+window.getState = store.getState;
