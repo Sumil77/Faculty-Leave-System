@@ -32,7 +32,7 @@ export const signup = (user) => async (dispatch) => {
 };
 export const logout = () => async (dispatch) => {
   const response = await apiUtil.logout();
-  console.log(response);
+  console.log("logout triggered");
   const data = await response.json();
   if (response.ok) {
     return dispatch(logoutCurrentUser());

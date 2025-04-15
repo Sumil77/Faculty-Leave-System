@@ -42,7 +42,16 @@ sessionRouter.delete("", ({ session }, res) => {
   }
 });
 
-sessionRouter.get("", ({ session: { user }}, res) => {
-    res.status(200).send({ user });
-  });
+sessionRouter.get("", (req, res) => {
+  const user = req.session.user;
+  console.log("🔍 Session user:", user); // log to verify session data
+  
+  if (req.session.user) {
+    req.session.touch();
+    return res.status(200).send({ user }); // If the user is in session, send it back
+  }
+
+  // If the user is not logged in, respond with an error
+  res.status(401).send({ error: "Not logged in" });
+});
 export default sessionRouter;

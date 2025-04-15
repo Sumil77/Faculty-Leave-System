@@ -7,12 +7,12 @@ import "./styles/index.css";
 import { BrowserRouter } from "react-router-dom";
 import { checkLoggedIn } from "./util/session";
 
-const renderApp = preloadedState => {
-  const store = configureStore(preloadedState);
-  ReactDOM.createRoot(document.getElementById("root")).render(
+const store = configureStore();
+
+ReactDOM.createRoot(document.getElementById("root")).render(
+  <BrowserRouter>
     <Provider store={store}>
-        <App />
-    </Provider>,
-  );
-};
-(async () => renderApp(await checkLoggedIn()))();
+      <App />
+    </Provider>
+  </BrowserRouter>
+);

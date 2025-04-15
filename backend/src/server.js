@@ -28,7 +28,7 @@ const pgPool = new Pool({
   try {
     await sequelize.authenticate();
     console.log("PostgreSQL connected");
-    await sequelize.sync({ force: true });
+    await sequelize.sync({ force: false, alter : true });
     const app = express();
 
     app.use(cors({
@@ -49,7 +49,7 @@ const pgPool = new Pool({
             tableName: "session",
             ttl: parseInt(SESS_LIFETIME) /1000,
             createTableIfMissing: true,
-            // pruneSessionInterval: 30, 
+            pruneSessionInterval: 10, 
           }),
           cookie: {
             sameSite: true,
