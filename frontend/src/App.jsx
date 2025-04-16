@@ -7,7 +7,7 @@ import AppRoutes from "./routes/AppRoutes";  // Import your AppRoutes component
 
 function App() {
   return (
-    <Router>
+<>
       <Navbar />
       <div className="flex">
         {/* Sidebar Section */}
@@ -29,7 +29,7 @@ function App() {
         </div>
       </div>
       <Footer />
-    </Router>
+      </>
   );
 }
 
