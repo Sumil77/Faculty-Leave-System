@@ -1,5 +1,6 @@
 import React, { useState } from "react";
-
+import { useDispatch, useSelector } from "react-redux";
+import { login } from "../actions/session.js";
 const departments = ["CSE", "IT", "ECE", "EEE"]; // Updated departments
 
 const generateCaptcha = () => {
@@ -11,17 +12,20 @@ const generateCaptcha = () => {
 };
 
 const Login = () => {
-  const [username, setUsername] = useState("");
+  const [error, setError] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [department, setDepartment] = useState("");
   const [captcha, setCaptcha] = useState(generateCaptcha());
   const [userCaptcha, setUserCaptcha] = useState("");
-  const [error, setError] = useState("");
+
+  const dispatch = useDispatch();
+  const errors = useSelector((state) => state.errors); // Assuming errors are stored in state.errors
 
   const handleSubmit = (e) => {
     e.preventDefault();
 
-    if (!department || !username || !password || !userCaptcha) {
+    if (!department || !email || !password || !userCaptcha) {
       setError("All fields are required!");
       return;
     }
@@ -33,13 +37,14 @@ const Login = () => {
       return;
     }
 
-    setError(""); // Clear errors
+    const user = {
+      email: email,
+      password: password,
+    };
 
-    // Mock authentication (Replace this with API call)
-    console.log(`Logging in as ${username} from ${department}`);
-    alert("Login Successful!");
-
-    // Redirect to dashboard or next page (Replace with actual navigation)
+    dispatch(login(user)); // Dispatch the login action
+    
+    // Optionally, add redirect logic here after login is successful
   };
 
   return (
@@ -47,7 +52,7 @@ const Login = () => {
       <div className="bg-white p-6 rounded-lg shadow-md w-96">
         <h2 className="text-2xl font-bold text-center text-blue-700">Login</h2>
 
-        {error && <p className="text-red-500 text-sm text-center">{error}</p>}
+        {(error || errors) && <p className="text-red-500 text-sm text-center">{error || errors}</p>}
 
         <form onSubmit={handleSubmit} className="space-y-4 mt-4">
           {/* Department Selection */}
@@ -69,13 +74,13 @@ const Login = () => {
 
           {/* Username Input */}
           <div>
-            <label className="block text-gray-700">Username</label>
+            <label className="block text-gray-700">Email</label>
             <input
               type="text"
               className="w-full p-2 border rounded"
-              placeholder="Enter username"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
+              placeholder="Enter email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
             />
           </div>
 
