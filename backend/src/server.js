@@ -10,8 +10,8 @@ import { PORT, NODE_ENV, sequelize,SESS_NAME, SESS_SECRET, SESS_LIFETIME,  DB_HO
     DB_NAME,
     DB_PORT, } from "./config.js";
 import pkg from 'pg';
-const { Pool } = pkg;
 
+const { Pool } = pkg;
 
 
 const PgSession = pgSession(session);
@@ -28,7 +28,8 @@ const pgPool = new Pool({
   try {
     await sequelize.authenticate();
     console.log("PostgreSQL connected");
-    await sequelize.sync({ force: false, alter : true });
+    await sequelize.sync({ force: true});
+    // await sequelize.sync({ force: false, alter : true });  //backend testing only
     const app = express();
 
     app.use(cors({
@@ -47,9 +48,9 @@ const pgPool = new Pool({
           store: new PgSession({
             pool: pgPool,
             tableName: "session",
-            ttl: parseInt(SESS_LIFETIME) /1000,
+            ttl: parseInt(SESS_LIFETIME) /1000,  // in seconds
             createTableIfMissing: true,
-            pruneSessionInterval: 10, 
+            // pruneSessionInterval: 10,  // for backend testing only
           }),
           cookie: {
             sameSite: true,

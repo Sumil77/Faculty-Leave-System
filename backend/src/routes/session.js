@@ -3,6 +3,7 @@ import User from "../models/user.js";
 import { signIn } from "../validations/user.js";
 import { parseError, sessionizeUser } from "../util/helpers.js";
 import { SESS_NAME } from "../config.js";
+
 const sessionRouter = express.Router();
 
 sessionRouter.post("", async (req, res) => {
@@ -25,6 +26,7 @@ sessionRouter.post("", async (req, res) => {
       return res.status(401).send(parseError(err));
     }
 });
+
 sessionRouter.delete("", ({ session }, res) => {
   if (session?.user) {
     session.destroy(err => {
@@ -54,4 +56,5 @@ sessionRouter.get("", (req, res) => {
   // If the user is not logged in, respond with an error
   res.status(401).send({ error: "Not logged in" });
 });
+
 export default sessionRouter;

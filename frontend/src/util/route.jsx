@@ -3,7 +3,9 @@ import { useSelector, useDispatch } from "react-redux";
 import { Navigate, useLocation, Outlet } from "react-router-dom";
 import { logout , receiveCurrentUser } from "../actions/session";
 
-const isBypassAuth = import.meta.env.VITE_BYPASS_AUTH ;
+// <-- REMOVE IN PRODUCTION
+const isBypassAuth = import.meta.env.VITE_BYPASS_AUTH === "true";
+// -->
 
 export const AuthRoute = ({ children }) => {
   const loggedIn = useSelector((state) => Boolean(state.session.userId));
@@ -29,10 +31,13 @@ export const ProtectedRoute = ({ children }) => {
   const validateSession = async () => {
     console.log(isBypassAuth);
     
+    // <-- REMOVE IN PRODUCTION
     if (isBypassAuth) {
       setChecking(false);
       return;
     }
+    // -->
+
     try {
       const res = await fetch("/api/session", {
         credentials: "include", // send cookies
