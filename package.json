@@ -1,6 +1,7 @@
 {
   "scripts": {
     "dev": "npm --prefix frontend run dev",
+    "dev:back": "npm --prefix frontend run prod",
     "prod": "concurrently \"npm --prefix backend run dev\" \"npm --prefix frontend run prod\""
   },
   "devDependencies": {
