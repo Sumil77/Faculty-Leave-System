@@ -45,16 +45,25 @@ sessionRouter.delete("", ({ session }, res) => {
 });
 
 sessionRouter.get("", (req, res) => {
-  const user = req.session.user;
-  console.log("🔍 Session user:", user); // log to verify session data
-  
-  if (req.session.user) {
-    req.session.touch();
-    return res.status(200).send({ user }); // If the user is in session, send it back
+  const { user, cookie } = req.session;
+
+  if (!user) {
+    return res.status(401).send({ error: "Not logged in" });
   }
 
-  // If the user is not logged in, respond with an error
-  res.status(401).send({ error: "Not logged in" });
+  const now = new Date();
+  const expiry = new Date(cookie.expires);
+
+  // 🔥 Explicit expiry check
+  if (expiry < now) {
+    req.session.destroy(() => {
+      res.clearCookie(SESS_NAME);
+      console.log("⛔ Session expired (by manual check), destroying session.");
+      return res.status(401).send({ error: "Session expired" });
+    });
+  } else {
+    return res.status(200).send({ user });
+  }
 });
 
 export default sessionRouter;

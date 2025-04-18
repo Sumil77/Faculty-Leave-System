@@ -28,8 +28,8 @@ const pgPool = new Pool({
   try {
     await sequelize.authenticate();
     console.log("PostgreSQL connected");
-    await sequelize.sync({ force: true});
-    // await sequelize.sync({ force: false, alter : true });  //backend testing only
+    // await sequelize.sync({ force: false});
+    await sequelize.sync({ force: false, alter : true });  //backend testing only
     const app = express();
 
     app.use(cors({
@@ -45,12 +45,13 @@ const pgPool = new Pool({
           secret: SESS_SECRET,
           saveUninitialized: false,
           resave: false,
+          rolling : true,
           store: new PgSession({
             pool: pgPool,
             tableName: "session",
             ttl: parseInt(SESS_LIFETIME) /1000,  // in seconds
             createTableIfMissing: true,
-            // pruneSessionInterval: 10,  // for backend testing only
+            pruneSessionInterval: 5,  // for backend testing only
           }),
           cookie: {
             sameSite: true,
