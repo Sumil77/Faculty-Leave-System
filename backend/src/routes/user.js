@@ -1,4 +1,3 @@
-import Joi from "joi";
 import express from 'express';
 import User from '../models/user.js';
 import { signUp } from '../validations/user.js';
@@ -28,5 +27,5 @@ userRouter.post("", async (req, res) => {
       const status = err.name === "SequelizeValidationError" ? 400 : 500;
       res.status(status).send(parseError(err));
     }
-  });
+});
 export default userRouter;
