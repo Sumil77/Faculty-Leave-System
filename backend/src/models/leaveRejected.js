@@ -12,7 +12,7 @@ class LeaveRejected extends Model {
 LeaveRejected.init(
   {
     user_id: {
-      type: DataTypes.NUMBER,
+      type: DataTypes.BIGINT,
       allowNull: false,
     },
     appliedOn: {
@@ -38,7 +38,7 @@ LeaveRejected.init(
   },
   {
     sequelize,
-    modelName: "LeaveApproved",
+    modelName: "LeaveRejected",
     timestamps: true,
     hooks: {
     },

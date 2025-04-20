@@ -12,7 +12,7 @@ class LeaveApproved extends Model {
 LeaveApproved.init(
   {
     user_id: {
-      type: DataTypes.NUMBER,
+      type: DataTypes.BIGINT,
       allowNull: false,
     },
     appliedOn: {

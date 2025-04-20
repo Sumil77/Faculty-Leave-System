@@ -18,8 +18,9 @@ class Credentials extends Model {
 Credentials.init(
   {
     user_id: {
-      type: DataTypes.NUMBER,
+      type: DataTypes.BIGINT,
       allowNull: false,
+      primaryKey : true,
       unique: {
         msg: "User_Id already exists",
       },

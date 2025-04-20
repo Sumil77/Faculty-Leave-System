@@ -1,7 +1,7 @@
 // server.js
 import cors from "cors";
 import express from "express";
-import {userRoutes , sessionRoutes} from "./routes/index.js";
+import {userRoutes , sessionRoutes, leaveRoutes} from "./routes/index.js";
 import session from "express-session";
 import pgSession from "connect-pg-simple";
 import { PORT, NODE_ENV, sequelize,SESS_NAME, SESS_SECRET, SESS_LIFETIME,  DB_HOST,
@@ -28,8 +28,8 @@ const pgPool = new Pool({
   try {
     await sequelize.authenticate();
     console.log("PostgreSQL connected");
-    // await sequelize.sync({ force: false});
-    await sequelize.sync({ force: false, alter : true });  //backend testing only
+    await sequelize.sync({ force: true});
+    // await sequelize.sync({ force: false, alter : true });  //backend testing only
     const app = express();
 
     app.use(cors({
@@ -71,6 +71,7 @@ const pgPool = new Pool({
     app.use("/api", apiRouter);
     apiRouter.use("/users", userRoutes);
     apiRouter.use('/session', sessionRoutes);
+    apiRouter.use('/leave', leaveRoutes);
 
     // Start server (optional - could move to index.js)
     app.listen(PORT, () => console.log(`Listening on port ${PORT}`));

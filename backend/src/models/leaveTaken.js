@@ -6,7 +6,7 @@ class LeaveTaken extends Model {}
 LeaveTaken.init(
   {
     user_id: {
-      type: DataTypes.INTEGER,
+      type: DataTypes.BIGINT,
       allowNull: false,
       primaryKey: true,
     },

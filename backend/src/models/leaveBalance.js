@@ -6,7 +6,7 @@ class LeaveBalance extends Model {}
 LeaveBalance.init(
   {
     user_id: {
-      type: DataTypes.INTEGER,
+      type: DataTypes.BIGINT,
       allowNull: false,
       primaryKey: true,
     },

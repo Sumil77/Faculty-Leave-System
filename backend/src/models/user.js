@@ -12,8 +12,9 @@ class User extends Model {
 User.init(
   {
     user_id: {
-      type: DataTypes.NUMBER,
+      type: DataTypes.BIGINT,
       allowNull: false,
+      primaryKey : true,
       unique: {
         msg: "User_Id already exists",
       },
@@ -55,7 +56,7 @@ User.init(
       allowNull: false,
     },
     phno: {
-      type: DataTypes.NUMBER,
+      type: DataTypes.BIGINT,
       allowNull: false,
     },
   },

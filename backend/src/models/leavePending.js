@@ -12,7 +12,7 @@ class LeavePending extends Model {
 LeavePending.init(
   {
     user_id: {
-      type: DataTypes.NUMBER,
+      type: DataTypes.BIGINT,
       allowNull: false,
     },
     appliedOn: {
