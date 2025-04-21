@@ -1,8 +1,8 @@
 import express from "express";
-import User from "../models/user.js";
-import { signIn } from "../validations/user.js";
+import { signIn } from "../validations/userValidations.js";
 import { parseError, sessionizeUser } from "../util/helpers.js";
 import { SESS_NAME } from "../config.js";
+import Credentials from "../models/credentials.js";
 
 const sessionRouter = express.Router();
 
@@ -14,7 +14,9 @@ sessionRouter.post("", async (req, res) => {
       console.log(error);
       return res.status(400).send(parseError(error));
     }
-    const user = await User.findOne({ where: { email } });
+    const user = await Credentials.findOne({ where: { email } });
+    console.log(user);
+    
     if (user && user.comparePasswords(password)) {
       const sessionUser = sessionizeUser(user);
       req.session.user = sessionUser;
@@ -23,6 +25,7 @@ sessionRouter.post("", async (req, res) => {
       throw new Error("Invalid login credentials");
     }
   } catch (err) {
+    console.log(err);
     return res.status(401).send(parseError(err));
   }
 });

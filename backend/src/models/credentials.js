@@ -26,7 +26,7 @@ Credentials.init(
       },
       validate: {
         async isUnique(value) {
-          const exists = await User.count({ where: { username: value } });
+          const exists = await Credentials.count({ where: { user_id: value } });
           if (exists) {
             throw new Error("User_Id already exists");
           }
@@ -42,7 +42,7 @@ Credentials.init(
       validate: {
         isEmail: { msg: "Must be a valid email" },
         async isUnique(value) {
-          const exists = await User.count({ where: { email: value } });
+          const exists = await Credentials.count({ where: { email: value } });
           if (exists) {
             throw new Error("Email already exists");
           }

@@ -1,6 +1,6 @@
 import express from 'express';
 import Credentials from '../models/credentials.js';
-import { signUp } from '../validations/user.js';
+import { signUp } from '../validations/userValidations.js';
 import {parseError} from "../util/helpers.js";
 
 const userRouter = express.Router();
@@ -10,13 +10,11 @@ userRouter.post("", async (req, res) => {
       const {user_id, email, password } = req.body;
   
       // Validate with Joi
-      await signUp.validateAsync({ user_id, email, password });
+      // await signUp.validateAsync({ user_id, email, password });
   
       // Create the new user, hashing will be handled in Sequelize hooks
       const newUser = await Credentials.create({user_id, email, password});
 
-      console.log(req.session)
-  
       res.status(201).send("User created");
     } catch (err) {
       console.error(err);
