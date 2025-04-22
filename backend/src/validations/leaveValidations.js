@@ -18,7 +18,6 @@ export const leaveTypes = {
   withoutPay: { fullName: "withoutPay", acronym: "CPL" },
 };
 
-
 // Step 1: Extract valid leave types
 const validLeaveTypes = Object.keys(leaveTypes);
 
@@ -56,21 +55,19 @@ export const validateLeaveBalance = async (
   fromDate,
   toDate
 ) => {
-
-  
   const balance = await LeaveBalance.findOne({
     where: { user_id: userId },
   });
-  
+
   if (!balance) {
     throw new Error("Leave balance not found for user.");
   }
   console.log(validLeaveTypes.includes(typeOfLeave));
-  
+
   if (!validLeaveTypes.includes(typeOfLeave)) {
     throw new Error("Invalid leave type provided.");
   }
-  
+
   const leaveBalanceAvailable = balance[typeOfLeave];
 
   const numDays =
@@ -78,7 +75,10 @@ export const validateLeaveBalance = async (
 
   if (leaveBalanceAvailable < numDays) {
     throw new Error(
-      "Insufficient balance. You have "+ leaveBalanceAvailable + " days available for " + leaveTypes[typeOfLeave].fullName
+      "Insufficient balance. You have " +
+        leaveBalanceAvailable +
+        " days available for " +
+        leaveTypes[typeOfLeave].fullName
     );
   }
 };

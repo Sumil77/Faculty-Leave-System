@@ -6,6 +6,7 @@ import {
   getLeaveBalance,
   getLeaveTaken,
   postAppliedLeave,
+  postCancelPending
 } from "../util/leaveHelper.js";
 
 const leaveRouter = express.Router();
@@ -32,6 +33,10 @@ leaveRouter.get("/taken", (req, res) => {
 
 leaveRouter.post("/apply" , (req,res)=>{
   postAppliedLeave(req,res);
+})
+
+leaveRouter.post("/cancelPending", (req,res)=>{
+  postCancelPending(req,res);
 })
 
 export default leaveRouter;
