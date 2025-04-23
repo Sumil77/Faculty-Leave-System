@@ -98,13 +98,13 @@ export const getLeavePending = async (req, res) => {
 
 export const getLeaveBalance = async (req, res) => {
   const user_id = req.session.user.user_id;
-  const data = await LeaveBalance.find({
+  const data = await LeaveBalance.findAll({
     where: { user_id },
+    raw:true
   });
-
-  res.json({
-    data,
-  });
+  console.log(data);
+  
+  return res.status(200).json(data);
 };
 
 export const getLeaveTaken = async (req, res) => {
@@ -121,34 +121,37 @@ export const getLeaveTaken = async (req, res) => {
 export const postAppliedLeave = async (req, res) => {
   const user_id = req.session.user.user_id;
   const dept = req.session.user.dept;
-  const appliedOn = req.query.time;
-  const fromDate = req.query.from;
-  const toDate = req.query.to;
-  const typeOfLeave = req.query.type;
-
-  console.log({ user_id, dept, appliedOn, fromDate, toDate, typeOfLeave });
-
+  const appliedOn = req.body.time;
+  const fromDate = req.body.from;
+  const toDate = req.body.to;
+  const leaveType = req.body.type;
+  
+  
   try {
     await leaveSchema.validateAsync({
       appliedOn,
       fromDate,
       toDate,
-      typeOfLeave,
+      leaveType,
     });
-
-    await validateLeaveBalance(user_id, typeOfLeave, fromDate, toDate);
+    console.log("ok");
+    
+    await validateLeaveBalance(user_id, leaveType, fromDate, toDate);
 
     const leaveCreated = await LeavePending.create({
       user_id,
       appliedOn,
       fromDate,
       toDate,
-      typeOfLeave,
+      leaveType,
       dept,
     });
 
-    return res.status(200).send(leaveCreated);
+    
+    return res.status(200).json(leaveCreated);
   } catch (err) {
+    console.error(err);
+    
     return res.status(401).send(parseError(err));
   }
 };
@@ -197,9 +200,49 @@ export const postCancelPending = async (req, res) => {
       cancelled: toCancel,
       notCanceled,
     });
-
   } catch (error) {
     console.error(error);
+    return res.status(500).send(parseError(error));
+  }
+};
+
+export const getRecentLeaves = async (req, res) => {
+  try {
+    // const user_id = req.query.user_id;
+    const user = req.session.user;
+
+    const today = new Date();
+    const monthAgo = new Date();
+    monthAgo.setMonth(today.getMonth() - 1);
+    const [pending, approved] = await Promise.all([
+      LeavePending.findAll({
+        where: {
+          user_id: user.user_id,
+          fromDate: { [Op.between]: [monthAgo, today] },
+        },
+      }),
+      LeaveApproved.findAll({
+        where: {
+          user_id: user.user_id,
+          fromDate: { [Op.between]: [monthAgo, today] },
+        },
+      }),
+    ]);
+
+    const tagged = pending
+      .map((p) => ({ ...p.dataValues, status: "Pending" }))
+      .concat(approved.map((a) => ({ ...a.dataValues, status: "Approved" })));
+
+    const recents = tagged.sort(
+      (a, b) => new Date(b.appliedOn) - new Date(a.appliedOn)
+    );
+
+    console.log(recents.map((l) => l.id));
+
+    return res.status(200).json(recents);
+  } catch (error) {
+    console.error("Error Recent Leaves:", error);
+
     return res.status(500).send(parseError(error));
   }
 };

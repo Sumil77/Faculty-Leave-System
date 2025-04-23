@@ -8,7 +8,7 @@ const isBypassAuth = import.meta.env.VITE_BYPASS_AUTH === "true";
 // -->
 
 export const AuthRoute = ({ children }) => {
-  const loggedIn = useSelector((state) => Boolean(state.session.userId));
+  const loggedIn = useSelector((state) => Boolean(state.session.user_id));
   const location = useLocation();
 
   if (loggedIn && !isBypassAuth) {
@@ -19,7 +19,7 @@ export const AuthRoute = ({ children }) => {
 };
 
 export const ProtectedRoute = ({ children }) => {
-  const loggedIn = useSelector((state) => Boolean(state.session.userId));
+  const loggedIn = useSelector((state) => Boolean(state.session.user_id));
   const dispatch = useDispatch();
   const [checking, setChecking] = useState(true);
   const location = useLocation();

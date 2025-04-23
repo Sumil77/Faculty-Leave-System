@@ -4,7 +4,7 @@ import express from "express";
 import { userRoutes, sessionRoutes, leaveRoutes } from "./routes/index.js";
 import session from "express-session";
 import pgSession from "connect-pg-simple";
-import requireAuth from "./util/sessionexpire.js";
+// import requireAuth from "./util/sessionexpire.js";
 import {
   PORT,
   NODE_ENV,

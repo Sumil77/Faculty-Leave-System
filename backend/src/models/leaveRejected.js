@@ -27,7 +27,7 @@ LeaveRejected.init(
         type:DataTypes.DATEONLY,
         allowNull:false
     },
-    typeOfLeave:{
+    leaveType:{
         type:DataTypes.STRING,
         allowNull: false
     },

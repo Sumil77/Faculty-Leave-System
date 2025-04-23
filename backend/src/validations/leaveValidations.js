@@ -24,34 +24,42 @@ const validLeaveTypes = Object.keys(leaveTypes);
 // Step 2: Create schema
 export const leaveSchema = Joi.object({
   appliedOn: Joi.date().required().label("Applied On"),
+
   fromDate: Joi.date()
-    .min(Joi.ref("appliedOn"))
     .required()
     .label("From Date")
-    .messages({
-      "date.min": `"From Date" cannot be before "Applied On"`,
+    .custom((value, helpers) => {
+      const { appliedOn } = helpers.state.ancestors[0];
+      if (new Date(value) < new Date(appliedOn.toDateString())) {
+        return helpers.message(`"From Date" cannot be before "Applied On"`);
+      }
+      return value;
     }),
+
   toDate: Joi.date()
-    .min(Joi.ref("fromDate"))
     .required()
     .label("To Date")
-    .messages({
-      "date.min": `"To Date" cannot be before "From Date"`,
+    .custom((value, helpers) => {
+      const { fromDate } = helpers.state.ancestors[0];
+      if (new Date(value) < new Date(fromDate)) {
+        return helpers.message(`"To Date" cannot be before "From Date"`);
+      }
+      return value;
     }),
-  typeOfLeave: Joi.string()
+
+  leaveType: Joi.string()
     .valid(...validLeaveTypes)
     .required()
     .label("Type of Leave")
     .messages({
-      "any.only": `"Type of Leave" must be one of: ${validLeaveTypes.join(
-        ", "
-      )}`,
+      "any.only": `"Type of Leave" must be one of: ${validLeaveTypes.join(", ")}`,
     }),
 });
 
+
 export const validateLeaveBalance = async (
   userId,
-  typeOfLeave,
+  leaveType,
   fromDate,
   toDate
 ) => {
@@ -62,13 +70,13 @@ export const validateLeaveBalance = async (
   if (!balance) {
     throw new Error("Leave balance not found for user.");
   }
-  console.log(validLeaveTypes.includes(typeOfLeave));
+  console.log(validLeaveTypes.includes(leaveType));
 
-  if (!validLeaveTypes.includes(typeOfLeave)) {
+  if (!validLeaveTypes.includes(leaveType)) {
     throw new Error("Invalid leave type provided.");
   }
 
-  const leaveBalanceAvailable = balance[typeOfLeave];
+  const leaveBalanceAvailable = balance[leaveType];
 
   const numDays =
     (new Date(toDate) - new Date(fromDate)) / (1000 * 60 * 60 * 24) + 1;
@@ -78,7 +86,7 @@ export const validateLeaveBalance = async (
       "Insufficient balance. You have " +
         leaveBalanceAvailable +
         " days available for " +
-        leaveTypes[typeOfLeave].fullName
+        leaveTypes[leaveType].fullName
     );
   }
 };

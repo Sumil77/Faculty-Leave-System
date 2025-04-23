@@ -1,42 +1,22 @@
 import express from "express";
-import {
-  getLeaveApproved,
-  getLeaveRejected,
-  getLeavePending,
-  getLeaveBalance,
-  getLeaveTaken,
-  postAppliedLeave,
-  postCancelPending
-} from "../util/leaveHelper.js";
+import * as leaveController from "../util/leaveHelper.js";
 
 const leaveRouter = express.Router();
 
-leaveRouter.get("/approved", (req, res) => {
-  getLeaveApproved(req,res);
-});
+leaveRouter.get("/approved", leaveController.getLeaveApproved);
 
-leaveRouter.get("/pending", (req, res) => {
-  getLeavePending(req,res);
-});
+leaveRouter.get("/pending", leaveController.getLeavePending);
 
-leaveRouter.get("/rejected", (req, res) => {
-  getLeaveRejected(req,res);
-});
+leaveRouter.get("/rejected", leaveController.getLeaveRejected);
 
-leaveRouter.get("/balance", (req, res) => {
-  getLeaveBalance(req,res);
-});
+leaveRouter.get("/balance", leaveController.getLeaveBalance);
 
-leaveRouter.get("/taken", (req, res) => {
-  getLeaveTaken(req,res);
-});
+leaveRouter.get("/taken", leaveController.getLeaveTaken);
 
-leaveRouter.post("/apply" , (req,res)=>{
-  postAppliedLeave(req,res);
-})
+leaveRouter.post("/apply", leaveController.postAppliedLeave);
 
-leaveRouter.post("/cancelPending", (req,res)=>{
-  postCancelPending(req,res);
-})
+leaveRouter.post("/cancelPending", leaveController.postCancelPending);
+
+leaveRouter.get("/recent", leaveController.getRecentLeaves);
 
 export default leaveRouter;
