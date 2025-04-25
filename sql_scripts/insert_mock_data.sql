@@ -1,4 +1,4 @@
-INSERT INTO "LeaveBalances" (user_id, "dateOfJoining", casual, medical, "specialCasual", "extraOrdinary", earned, "onDutyExam", "onDutyOther", maternity, election, compensatory, "withoutPay", "createdAt", "updatedAt") 
+INSERT INTO public."LeaveBalance" (user_id, "dateOfJoining", casual, medical, "specialCasual", "extraOrdinary", earned, "onDutyExam", "onDutyOther", maternity, election, compensatory, "withoutPay", "createdAt", "updatedAt") 
 	VALUES 
 	(123, '2023-07-01', 5, 2, 1, 0, 3, 1, 1, 0, 0, 0, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
 
@@ -73,3 +73,6 @@ SELECT
 FROM "LeaveApproved"
 WHERE "fromDate" >= CURRENT_DATE - INTERVAL '1 month'
 ORDER BY "fromDate" DESC;
+
+
+select * from public."session"
