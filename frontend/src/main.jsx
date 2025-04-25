@@ -11,7 +11,7 @@ import rootReducer from "./reducers/root.js"
 // <-- REMOVE IN PRODUCTION 
 const isBypassAuth = import.meta.env.VITE_BYPASS_AUTH;
 const mockSession = {
-    userId: "mock123",
+    user_id: "123",
     username: "DevUser",
 };
 

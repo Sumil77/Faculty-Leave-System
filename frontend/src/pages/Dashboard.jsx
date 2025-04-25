@@ -1,5 +1,6 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import IDCard from "../components/IdCard";
+import * as leaveController from "../util/leave.js";
 import { FaRegCalendarAlt, FaRegHandPaper, FaHospital, FaUserShield, FaRegClock } from "react-icons/fa";
 
 const facultyData = {
@@ -11,58 +12,26 @@ const facultyData = {
   dateOfJoining: "2020-08-15",
 };
 
-// Mapping leave type codes to human-readable descriptions
-const leaveTypes = {
-  "1": "Casual Leave",
-  "2": "Medical Leave",
-  "3": "Special Casual Leave",
-  "4": "Extra Ordinary Leave",
-  "5": "Earned Leave",
-  "6-i": "On Duty Leave (Exam Purpose)",
-  "6-ii": "On Duty Leave (General Rest)",
-  "7": "Maternity Leave",
-  "8": "Election Leave (College Election)",
-  "9": "Compensatory Leave",
-  "10": "Leave Without Pay",
-};
+const leaveObj = leaveController.leaveTypes
+
+const leaveTypes = Object(leaveObj)
 
 // Icons for leave types
 const leaveIcons = {
-  "1": <FaRegCalendarAlt />,
-  "2": <FaHospital />,
-  "3": <FaRegHandPaper />,
-  "4": <FaUserShield />,
-  "5": <FaRegClock />,
-  "6-i": <FaRegCalendarAlt />,
-  "6-ii": <FaRegCalendarAlt />,
-  "7": <FaRegHandPaper />,
-  "8": <FaUserShield />,
-  "9": <FaRegClock />,
-  "10": <FaRegHandPaper />,
+  casual: <FaRegCalendarAlt />,
+  medical: <FaHospital />,
+  special: <FaRegHandPaper />,
+  extraOrdinary: <FaUserShield />,
+  earned: <FaRegClock />,
+  onDutyExam: <FaRegCalendarAlt />,
+  onDutyOther: <FaRegCalendarAlt />,
+  maternity: <FaRegHandPaper />,
+  election: <FaUserShield />,
+  compensatory: <FaRegClock />,
+  withoutPay: <FaRegHandPaper />,
 };
 
 // Sample leave balance data
-const leaveBalances = {
-  "1": 10, // Casual Leave
-  "2": 5,  // Medical Leave
-  "3": 7,  // Special Casual Leave
-  "4": 3,  // Extra Ordinary Leave
-  "5": 15, // Earned Leave
-  "6-i": 2, // On Duty Leave (Exam Purpose)
-  "6-ii": 5, // On Duty Leave (General Rest)
-  "7": 90, // Maternity Leave
-  "8": 1,  // Election Leave
-  "9": 5,  // Compensatory Leave
-  "10": 0, // Leave Without Pay
-};
-
-const allLeaves = [
-  { date: "2023-11-12", leaveType: "1", status: "Approved" },
-  { date: "2024-01-05", leaveType: "2", status: "Rejected" },
-  { date: "2024-02-20", leaveType: "3", status: "Approved" },
-  { date: "2024-03-15", leaveType: "6-i", status: "Pending" },
-  { date: "2023-05-10", leaveType: "7", status: "Approved" },
-];
 
 const getStatusColor = (status) => {
   switch (status.toLowerCase()) {
@@ -88,26 +57,50 @@ const formatDate = (dateString) => {
 const Dashboard = () => {
   const [yearFilter, setYearFilter] = useState("All");
   const [monthFilter, setMonthFilter] = useState("All");
+  const [recentLeaves, setRecentLeaves] = useState([]);
+  const [leaveBalances, setLeaveBalance] = useState([]);
   const [sortAsc, setSortAsc] = useState(true);
 
+
+  useEffect(() => {
+    const fetchLeaveBalance = async () => {
+      const data = await leaveController.getLeaveBalance();
+      if (Array.isArray(data) && data.length > 0) {
+
+        setLeaveBalance(data[0]); // extract the actual data
+      }
+    };
+
+    const fetchRecentLeaves = async () => {
+      const data = await leaveController.getRecent();
+      setRecentLeaves(data);
+    };
+
+    fetchLeaveBalance();
+    fetchRecentLeaves();
+
+    console.log(leaveBalances[0]);
+
+  }, []);
+
   const getFilteredLeaves = () => {
-    let filtered = [...allLeaves];
+    let filtered = [...recentLeaves];
 
     if (yearFilter !== "All") {
       filtered = filtered.filter(
-        (leave) => new Date(leave.date).getFullYear().toString() === yearFilter
+        (leave) => new Date(leave.fromDate).getFullYear().toString() === yearFilter
       );
     }
 
     if (monthFilter !== "All") {
       filtered = filtered.filter(
-        (leave) => new Date(leave.date).getMonth().toString() === monthFilter
+        (leave) => new Date(leave.fromDate).getMonth().toString() === monthFilter
       );
     }
 
     filtered.sort((a, b) => {
-      const dateA = new Date(a.date);
-      const dateB = new Date(b.date);
+      const dateA = new Date(a.fromDate);
+      const dateB = new Date(b.fromDate);
       return sortAsc ? dateA - dateB : dateB - dateA;
     });
 
@@ -116,7 +109,7 @@ const Dashboard = () => {
 
   const filteredLeaves = getFilteredLeaves();
 
-  const years = [...new Set(allLeaves.map((l) => new Date(l.date).getFullYear().toString()))];
+  const years = [...new Set(recentLeaves.map((l) => new Date(l.fromDate).getFullYear().toString()))];
   const months = [
     "January", "February", "March", "April", "May", "June",
     "July", "August", "September", "October", "November", "December",
@@ -165,33 +158,37 @@ const Dashboard = () => {
           </div>
 
           {/* Table */}
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-gray-200 text-gray-700">
-                <th className="p-3 border-b">Date</th>
-                <th className="p-3 border-b">Leave Type</th>
-                <th className="p-3 border-b">Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredLeaves.map((leave, index) => (
-                <tr key={index} className="hover:bg-gray-100">
-                  <td className="p-3 border-b">{formatDate(leave.date)}</td>
-                  <td className="p-3 border-b">{leaveTypes[leave.leaveType]}</td>
-                  <td className={`p-3 border-b ${getStatusColor(leave.status)}`}>
-                    {leave.status}
-                  </td>
+          {/* Scrollable Table Container */}
+          <div className="overflow-x-auto max-h-[400px] overflow-y-auto">
+            <table className="w-full text-left border-collapse">
+              <thead className="sticky top-0 bg-gray-200 z-10">
+                <tr className="text-gray-700">
+                  <th className="p-3 border-b">Date</th>
+                  <th className="p-3 border-b">Leave Type</th>
+                  <th className="p-3 border-b">Status</th>
                 </tr>
-              ))}
-              {filteredLeaves.length === 0 && (
-                <tr>
-                  <td colSpan="3" className="p-4 text-center text-gray-500">
-                    No leaves found for selected filters.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {filteredLeaves.map((leave, index) => (
+                  <tr key={index} className="hover:bg-gray-100">
+                    <td className="p-3 border-b">{formatDate(leave.fromDate)}</td>
+                    <td className="p-3 border-b">{leaveTypes[leave.leaveType]?.fullName || "Unknown"}</td>
+                    <td className={`p-3 border-b ${getStatusColor(leave.status)}`}>
+                      {leave.status}
+                    </td>
+                  </tr>
+                ))}
+                {filteredLeaves.length === 0 && (
+                  <tr>
+                    <td colSpan="3" className="p-4 text-center text-gray-500">
+                      No leaves found for selected filters.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
         </div>
 
         {/* ID Card */}
@@ -204,20 +201,19 @@ const Dashboard = () => {
       <div className="bg-white shadow-lg rounded-lg p-6 mt-6">
         <h3 className="text-2xl font-bold mb-4 text-gray-800">Leave Balances</h3>
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-          {Object.entries(leaveBalances).map(([leaveType, balance]) => (
+          {Object.entries(leaveBalances).filter(([leaveType]) => leaveType in leaveTypes).map(([leaveType, balance]) => (
             <div
               key={leaveType}
-              className={`flex items-center justify-between p-6 border rounded-lg shadow-md transform transition-all duration-300 ${
-                balance === 0
-                  ? "bg-red-100 hover:scale-105"
-                  : balance <= 3
+              className={`flex items-center justify-between p-6 border rounded-lg shadow-md transform transition-all duration-300 ${balance === 0
+                ? "bg-red-100 hover:scale-105"
+                : balance <= 3
                   ? "bg-yellow-100 hover:scale-105"
                   : "bg-green-100 hover:scale-110"
-              }`}
+                }`}
             >
               <div className="flex items-center space-x-3">
                 <div className="text-xl text-gray-700">{leaveIcons[leaveType]}</div>
-                <span className="text-lg font-semibold text-gray-800">{leaveTypes[leaveType]}</span>
+                <span className="text-lg font-semibold text-gray-800">{leaveObj[leaveType].fullName}</span>
               </div>
               <span className="text-lg font-semibold text-gray-900">{balance} days</span>
             </div>

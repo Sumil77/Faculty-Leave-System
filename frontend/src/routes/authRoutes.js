@@ -3,7 +3,7 @@ import { useSelector } from "react-redux";
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 
 const AuthRoute = ({ redirectPath = "/dashboard", children }) => {
-  const isLoggedIn = useSelector((state) => Boolean(state.session.userId));
+  const isLoggedIn = useSelector((state) => Boolean(state.session.user_id));
   const location = useLocation();
 
   if (isLoggedIn) {
