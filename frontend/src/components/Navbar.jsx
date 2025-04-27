@@ -15,7 +15,7 @@ const Navbar = () => {
         </Link>
         <div className="text-center">
           <h1 className="text-2xl font-bold text-red-700">
-            MAHARAJA SURAJMAL INSITUTE OF TECHNOLOGY
+            MAHARAJA SURAJMAL INSTITUTE OF TECHNOLOGY
           </h1>
           <p className="text-orange-600 text-sm">
             Affiliated to GGSIPU | NAAC Accredited 'A' Grade | NBA (CSE, IT,

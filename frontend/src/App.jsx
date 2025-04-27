@@ -1,7 +1,5 @@
-import { BrowserRouter as Router } from "react-router-dom";
 import Navbar from "./components/Navbar";
 import Sidebar from "./components/Sidebar";
-import LeaveBalance from "./components/LeaveBalance";
 import Footer from "./components/Footer";
 import AppRoutes from "./routes/AppRoutes";  // Import your AppRoutes component
 
@@ -14,11 +12,6 @@ function App() {
         <div className="w-64">
           <div className="h-[300px] overflow-hidden"> {/* ✅ Fixed shorter height */}
             <Sidebar />
-          </div>
-
-          {/* ✅ Leave Balance stays below but does NOT increase Sidebar height */}
-          <div className="mt-4">
-            <LeaveBalance />
           </div>
         </div>
 

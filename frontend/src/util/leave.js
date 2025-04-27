@@ -41,11 +41,38 @@ export const postLeavePending = async (leave) => {
   const response = await fetch("/api/leave/apply", {
     method: "POST",
     headers: {
-        "Content-Type": "application/json",
-      },
-    body : JSON.stringify(leave),
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(leave),
     credentials: "include",
   });
   const data = response.json();
   return data;
+};
+
+export const getLeaves = async (query) => {
+  console.log("getLeave: ", query);
+  const params = new URLSearchParams({
+    status: query.statusFilter,
+    type: query.typeFilter,
+    startDate: query.startDate,
+    endDate: query.endDate,
+    rangeField: query.rangeField,
+    page: query.page,
+    limit: query.limit,
+  });
+
+  const response = await fetch(`/api/leave/getLeave?${params.toString()}`, {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to fetch leaves");
+  }
+
+  const data = await response.json();
+  return data; // assuming backend returns { leaves: [], total: number }
 };

@@ -19,4 +19,6 @@ leaveRouter.post("/cancelPending", leaveController.postCancelPending);
 
 leaveRouter.get("/recent", leaveController.getRecentLeaves);
 
+leaveRouter.get("/getLeave",leaveController.getLeave);
+
 export default leaveRouter;
