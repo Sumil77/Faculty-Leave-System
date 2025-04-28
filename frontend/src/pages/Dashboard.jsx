@@ -116,9 +116,9 @@ const Dashboard = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-gray-100 p-6">
+    <div className="min-h-screen bg-gray-100">
       {/* Dashboard Heading */}
-      <h2 className="text-3xl font-bold text-gray-800 mb-6 flex justify-center pb-10">Faculty Dashboard</h2>
+      <h2 className="text-3xl font-bold text-gray-800 mb-6 flex justify-center">Faculty Dashboard</h2>
 
       <div className="flex flex-col lg:flex-row gap-6 justify-between items-start">
         {/* Past Leaves Table */}
@@ -199,7 +199,7 @@ const Dashboard = () => {
 
       {/* Leave Balances Section */}
       <div className="bg-white shadow-lg rounded-lg p-6 mt-6">
-        <h3 className="text-2xl font-bold mb-4 text-gray-800">Leave Balances</h3>
+        <h3 className="text-2xl font-bold mb-4 text-gray-800">Leave Balance (In Days)</h3>
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
           {Object.entries(leaveBalances).filter(([leaveType]) => leaveType in leaveTypes).map(([leaveType, balance]) => (
             <div
@@ -213,9 +213,9 @@ const Dashboard = () => {
             >
               <div className="flex items-center space-x-3">
                 <div className="text-xl text-gray-700">{leaveIcons[leaveType]}</div>
-                <span className="text-lg font-semibold text-gray-800">{leaveObj[leaveType].fullName}</span>
+                <span className="text-lg font-semibold text-gray-800">{leaveObj[leaveType].fullName}: </span>
               </div>
-              <span className="text-lg font-semibold text-gray-900">{balance} days</span>
+              <span className="text-lg font-semibold text-gray-900">{balance}</span>
             </div>
           ))}
         </div>

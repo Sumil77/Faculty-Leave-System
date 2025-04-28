@@ -4,7 +4,7 @@ import LeavePending from "../models/leavePending.js";
 import LeaveBalance from "../models/leaveBalance.js";
 import LeaveTaken from "../models/leaveTaken.js";
 import { parseError } from "./helpers.js";
-import { Op } from "sequelize";
+import { col, fn, literal, Op } from "sequelize";
 import {
   leaveSchema,
   validateLeaveBalance,
@@ -96,14 +96,114 @@ export const getLeavePending = async (req, res) => {
   });
 };
 
+export const getLeave = async (req, res) => {
+  const user_id = req.session.user.user_id;
+  const {
+    status,
+    type,
+    rangeField,
+    startDate,
+    endDate,
+    page = 1,
+    limit = 5,
+  } = req.query;
+  const offset = (page - 1) * limit;
+  const whereClause = { user_id };
+
+  console.log("backend",{
+    status,
+    type,
+    rangeField,
+    startDate,
+    endDate,
+    page,
+    limit ,
+  } );
+
+  const attrList = [
+    [literal(`TO_CHAR("appliedOn" AT TIME ZONE 'Asia/Kolkata', 'DD Mon YYYY, HH12:MI AM')`), 'appliedOn'],  // Convert to IST
+    'leaveType',
+    'fromDate',
+    'toDate',
+    'id'
+  ]
+  
+
+  if (rangeField && startDate && endDate) {
+    const from = new Date(startDate);
+    const to = new Date(endDate);
+    whereClause[rangeField] = { [Op.between]: [from,to] };
+  }
+
+  if (type && type !== 'null') {
+    whereClause.leaveType = type;
+  }
+
+  let totalEntries = null;
+  let data = {};
+  let orderBy = [['appliedOn', 'DESC']];
+
+  try {
+    if (status === "Pending") {
+      totalEntries = await LeavePending.count({ where: { user_id: user_id } });
+      data = await LeavePending.findAll({
+        where: whereClause,
+        attributes: attrList,
+        order : orderBy,
+        limit: limit,
+        offset: offset,
+      });
+    } else if (status === "Approved") {
+      totalEntries = await LeaveApproved.count({ where: { user_id: user_id } });
+      data = await LeaveApproved.findAll({
+        where: whereClause,
+        attributes: attrList,
+        order : orderBy,
+        limit: limit,
+        offset: offset,
+      });
+    } else if (status === "Rejected") {
+      totalEntries = await LeaveRejected.count({ where: { user_id: user_id } });
+      data = await LeavePending.findAll({
+        where: whereClause,
+        attributes: attrList,
+        order : orderBy,
+        limit: limit,
+        offset: offset,
+      });
+    } else {
+      throw new Error("Invalid Status.");
+    }
+
+    console.log(data);
+    
+
+    const totalPages = Math.ceil(totalEntries / limit);
+
+    res.json({
+      data,
+      pagination: {
+        currentPage: page,
+        totalPages,
+        totalEntries,
+        hasNextPage: page < totalPages,
+        hasPrevPage: page > 1,
+      },
+    });
+  } catch (err) {
+    console.error("Error GetLeave : ", err);
+    return res.status(401).send(parseError(err));
+  }
+};
+
 export const getLeaveBalance = async (req, res) => {
   const user_id = req.session.user.user_id;
   const data = await LeaveBalance.findAll({
     where: { user_id },
-    raw:true
+    raw: true,
   });
   console.log(data);
-  
+
   return res.status(200).json(data);
 };
 
@@ -125,8 +225,7 @@ export const postAppliedLeave = async (req, res) => {
   const fromDate = req.body.from;
   const toDate = req.body.to;
   const leaveType = req.body.type;
-  
-  
+
   try {
     await leaveSchema.validateAsync({
       appliedOn,
@@ -135,7 +234,7 @@ export const postAppliedLeave = async (req, res) => {
       leaveType,
     });
     console.log("ok");
-    
+
     await validateLeaveBalance(user_id, leaveType, fromDate, toDate);
 
     const leaveCreated = await LeavePending.create({
@@ -147,11 +246,10 @@ export const postAppliedLeave = async (req, res) => {
       dept,
     });
 
-    
     return res.status(200).json(leaveCreated);
   } catch (err) {
     console.error(err);
-    
+
     return res.status(401).send(parseError(err));
   }
 };
