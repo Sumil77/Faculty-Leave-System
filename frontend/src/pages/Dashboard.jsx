@@ -1,18 +1,12 @@
 import React, { useState, useEffect } from "react";
 import IDCard from "../components/IdCard";
 import * as leaveController from "../util/leave.js";
+import * as userController from "../util/user.js"
 import { FaRegCalendarAlt, FaRegHandPaper, FaHospital, FaUserShield, FaRegClock } from "react-icons/fa";
 
-const facultyData = {
-  name: "Dr. Anjali Sharma",
-  designation: "Assistant Professor",
-  department: "Computer Science",
-  email: "anjali.sharma@college.edu",
-  phone: "+91-9876543210",
-  dateOfJoining: "2020-08-15",
-};
+const facultyData = await userController.getUser();
 
-const leaveObj = leaveController.leaveTypes
+const leaveObj = leaveController.leaveTypes;
 
 const leaveTypes = Object(leaveObj)
 
@@ -79,7 +73,6 @@ const Dashboard = () => {
     fetchLeaveBalance();
     fetchRecentLeaves();
 
-    console.log(leaveBalances[0]);
 
   }, []);
 

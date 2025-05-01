@@ -20,7 +20,7 @@ Credentials.init(
     user_id: {
       type: DataTypes.BIGINT,
       allowNull: false,
-      primaryKey : true,
+      primaryKey: true,
       unique: {
         msg: "User_Id already exists",
       },
@@ -50,6 +50,14 @@ Credentials.init(
       },
     },
     password: {
+      type: DataTypes.STRING,
+      allowNull: false,
+    },
+    role: {
+      type: DataTypes.STRING,
+      allowNull: false,
+    },
+    status: {
       type: DataTypes.STRING,
       allowNull: false,
     },

@@ -13,12 +13,21 @@ leaveRouter.get("/balance", leaveController.getLeaveBalance);
 
 leaveRouter.get("/taken", leaveController.getLeaveTaken);
 
+leaveRouter.get("/recent", leaveController.getRecentLeaves);
+
+leaveRouter.get("/getLeave",leaveController.getLeave);
+
 leaveRouter.post("/apply", leaveController.postAppliedLeave);
 
 leaveRouter.post("/cancelPending", leaveController.postCancelPending);
 
-leaveRouter.get("/recent", leaveController.getRecentLeaves);
+leaveRouter.post("/approve", leaveController.approveLeaves);
 
-leaveRouter.get("/getLeave",leaveController.getLeave);
+leaveRouter.post("/reject", leaveController.rejectLeaves);
+
+leaveRouter.post("/grant-cpl" , leaveController.grantCpl);
+
+leaveRouter.get("/history", leaveController.getLeaveHistory);
+
 
 export default leaveRouter;

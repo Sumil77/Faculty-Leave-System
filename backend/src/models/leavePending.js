@@ -27,6 +27,10 @@ LeavePending.init(
         type:DataTypes.DATEONLY,
         allowNull:false
     },
+    totalDays: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+    },
     leaveType:{
         type:DataTypes.STRING,
         allowNull: false
@@ -41,6 +45,12 @@ LeavePending.init(
     modelName: "LeavePending",
     timestamps: true,
     hooks: {
+      beforeCreate: (leave) => {
+        leave.totalDays =
+          (new Date(leave.toDate) - new Date(leave.fromDate)) /
+            (1000 * 60 * 60 * 24) +
+          1;
+      },
     },
   }
 );

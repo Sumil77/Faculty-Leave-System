@@ -1,22 +1,64 @@
 import Credentials from "../models/credentials.js";
+import User from "../models/user.js";
 
-// helpers.js
 export const parseError = (err) => {
-  // Check if it's a Joi validation error
   if (err.isJoi) {
     return { message: err.details[0].message }; // Return only the message part of the error
   }
-
   // Handle general error
   if (err instanceof Error) {
-    return { message: err.message }; // Extract the message from the Error object
+    return { message: err.message };
   }
-
-  // Fallback if the error is not Joi or Error instance
   return { message: "An unknown error occurred" };
 };
 
 export const sessionizeUser = (cred) => {
   // const {user_id, name,  dept} = Credentials.find({where : cred.email});
-  return { user_id: 123, userName: "sumil", dept : "CSE"};
+  return { user_id: 123, userName: "sumil", dept: "CSE" };
 };
+
+export const getUser = async (req, res) => {
+  try {
+    const user_id = req.session.user.user_id;
+    const user = await User.findByPk(user_id, { raw: true });
+    console.log({
+      name: user.name,
+      email: user.email,
+      phno: user.phno,
+      desig: user.desig,
+      dept: user.dept,
+      doj: user.dateOfJoining,
+    });
+
+    res.send({
+      name: user.name,
+      email: user.email,
+      phno: user.phno,
+      desig: user.desig,
+      dept: user.dept,
+      doj: user.dateOfJoining,
+    });
+  } catch (error) {
+    console.log("Get User Error:", error);
+    return res.status(400).send(parseError(error));
+  }
+};
+
+export const createUser = async (req, res) => {
+  try {
+    const { user_id, email, password } = req.body;
+
+    // await signUp.validateAsync({ user_id, email, password });
+
+    const newUser = await Credentials.create({ user_id, email, password });
+
+    res.status(201).send("User created");
+  } catch (err) {
+    console.error(err);
+    // Handle validation or Sequelize errors
+    const status = err.name === "SequelizeValidationError" ? 400 : 500;
+    res.status(status).send(parseError(err));
+  }
+};
+
+export const updateUser = async (req,res) =>{}
