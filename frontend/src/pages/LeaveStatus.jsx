@@ -4,7 +4,7 @@ import * as leaveController from "../util/leave.js";
 const LeaveStatus = () => {
   const [leaves, setLeaves] = useState([]);
   const [statusFilter, setStatusFilter] = useState("Approved");
-  const [typeFilter, setTypeFilter] = useState(null);
+  const [typeFilter, setTypeFilter] = useState("");
   const [selectedLeaves, setSelectedLeaves] = useState([]);
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
@@ -14,6 +14,7 @@ const LeaveStatus = () => {
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const leaveTypes = leaveController.leaveTypes
 
   const loadLeaves = async () => {
     try {
@@ -53,7 +54,9 @@ const LeaveStatus = () => {
   };
 
   const handleCancelSelected = () => {
-    setLeaves(leaves.filter((leave) => !selectedLeaves.includes(leave.id)));
+    if (selectedLeaves) {
+      leaveController.cancelLeaves(selectedLeaves);
+    }
     setSelectedLeaves([]);
   };
 
@@ -76,23 +79,31 @@ const LeaveStatus = () => {
         </select>
 
         <select
-          className="p-2 border rounded"
           value={typeFilter}
           onChange={(e) => {
-            setTypeFilter(e.target.value);
+            setTypeFilter(e.target.value)
             setCurrentPage(1);
-          }}
+            setSelectedLeaves([]);
+          }
+          }
+          className="p-2 border rounded"
         >
-          <option value="*">All Types</option>
-          <option value="Sick Leave">Sick Leave</option>
-          <option value="Casual Leave">Casual Leave</option>
-          {/* Add more if needed */}
+          <option value="">Select Leave Type</option>
+          {Object.entries(leaveTypes).map(([key, type], idx) => (
+            <option key={idx} value={key}>
+              {type.fullName}
+            </option>
+          ))}
         </select>
 
         <select
           className="p-2 border rounded"
           value={dateField}
-          onChange={(e) => setDateField(e.target.value)}
+          onChange={(e) => {
+            setDateField(e.target.value);
+            setCurrentPage(1);
+            setSelectedLeaves([]);
+          }}
         >
           <option value="appliedOn">Applied On</option>
           <option value="fromDate">From Date</option>
@@ -103,13 +114,23 @@ const LeaveStatus = () => {
           type="date"
           className="p-2 border rounded"
           value={startDate}
-          onChange={(e) => setStartDate(e.target.value)}
+          onChange={(e) => {
+            setStartDate(e.target.value)
+            setCurrentPage(1);
+            setSelectedLeaves([]);
+          }
+          }
         />
         <input
           type="date"
           className="p-2 border rounded"
           value={endDate}
-          onChange={(e) => setEndDate(e.target.value)}
+          onChange={(e) => {
+            setEndDate(e.target.value)
+            setCurrentPage(1);
+            setSelectedLeaves([]);
+          }
+          }
         />
 
         <select
@@ -118,6 +139,7 @@ const LeaveStatus = () => {
           onChange={(e) => {
             setEntriesPerPage(Number(e.target.value));
             setCurrentPage(1);
+            setSelectedLeaves([]);
           }}
         >
           <option value={5}>5 per page</option>
@@ -127,18 +149,20 @@ const LeaveStatus = () => {
       </div>
 
       {/* Cancel Button */}
-      {statusFilter === "Pending" && (
-        <button
-          className={`mb-4 p-2 px-4 rounded ${selectedLeaves.length > 0
-            ? "bg-red-500 hover:bg-red-600 text-white"
-            : "bg-gray-400 cursor-not-allowed"
-            }`}
-          disabled={selectedLeaves.length === 0}
-          onClick={handleCancelSelected}
-        >
-          Cancel Selected Leaves
-        </button>
-      )}
+      {
+        statusFilter === "Pending" && (
+          <button
+            className={`mb-4 p-2 px-4 rounded ${selectedLeaves.length > 0
+              ? "bg-red-500 hover:bg-red-600 text-white"
+              : "bg-gray-400 cursor-not-allowed"
+              }`}
+            disabled={selectedLeaves.length === 0}
+            onClick={handleCancelSelected}
+          >
+            Cancel Selected Leaves
+          </button>
+        )
+      }
 
       {/* Table */}
       <div className="overflow-x-auto">
@@ -172,7 +196,7 @@ const LeaveStatus = () => {
                           />
                         </td>
                       )}
-                      <td className="p-2 border">{leave.appliedOn}</td>
+                      <td className="p-2 border">{leave.appliedOnIST}</td>
                       <td className="p-2 border">{leaveController.leaveTypes[leave.leaveType].fullName}</td>
                       <td className="p-2 border">{leave.fromDate}</td>
                       <td className="p-2 border">{leave.toDate}</td>
@@ -211,7 +235,7 @@ const LeaveStatus = () => {
           Next
         </button>
       </div>
-    </div>
+    </div >
   );
 };
 

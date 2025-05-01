@@ -4,7 +4,7 @@ import LeaveBalance from "../models/leaveBalance.js";
 export const leaveTypes = {
   casual: { fullName: "Casual", acronym: "CL" },
   medical: { fullName: "Medical", acronym: "ML" },
-  special: { fullName: "Special Casual", acronym: "SCL" },
+  specialCasual: { fullName: "Special Casual", acronym: "SCL" },
   extraOrdinary: { fullName: "Extra Ordinary", acronym: "EOL" },
   earned: { fullName: "Earned", acronym: "EL" },
   onDutyExam: {
@@ -15,7 +15,7 @@ export const leaveTypes = {
   maternity: { fullName: "Maternity", acronym: "MLv" },
   election: { fullName: "Election", acronym: "ELE" },
   compensatory: { fullName: "Compensatory", acronym: "CPL" },
-  withoutPay: { fullName: "withoutPay", acronym: "CPL" },
+  withoutPay: { fullName: "withoutPay", acronym: "WPL" },
 };
 
 // Step 1: Extract valid leave types

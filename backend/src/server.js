@@ -1,9 +1,10 @@
 // server.js
 import cors from "cors";
 import express from "express";
-import { userRoutes, sessionRoutes, leaveRoutes } from "./routes/index.js";
+import { userRoutes, sessionRoutes, leaveRoutes , reportRoutes} from "./routes/index.js";
 import session from "express-session";
 import pgSession from "connect-pg-simple";
+import user from "./models/user.js"
 // import requireAuth from "./util/sessionexpire.js";
 import {
   PORT,
@@ -12,31 +13,17 @@ import {
   SESS_NAME,
   SESS_SECRET,
   SESS_LIFETIME,
-  DB_HOST,
-  DB_USER,
-  DB_PASS,
-  DB_NAME,
-  DB_PORT,
+  pgPool
 } from "./config.js";
-import pkg from "pg";
-
-const { Pool } = pkg;
 
 const PgSession = pgSession(session);
-const pgPool = new Pool({
-  host: DB_HOST,
-  user: DB_USER,
-  password: DB_PASS,
-  database: DB_NAME,
-  port: DB_PORT || 5432,
-});
 
 (async () => {
   try {
     await sequelize.authenticate();
     console.log("PostgreSQL connected");
-    await sequelize.sync({ force: true });
-    // await sequelize.sync({ force: false, alter : true });  //backend testing only
+    // await sequelize.sync({ force: true });
+    await sequelize.sync({ force: false, alter : true });  //backend testing only
     const app = express();
 
     app.use(
@@ -86,11 +73,13 @@ const pgPool = new Pool({
     // <-- FOR PRODUCTION
     // apiRouter.use("/users", requireAuth, userRoutes);
     // apiRouter.use("/leave", requireAuth, leaveRoutes);
+    // apiRouter.use("/report",  reportRoutes);
     // -->
 
     // <-- REMOVE IN PRODUCTION
     apiRouter.use("/users",  userRoutes);
     apiRouter.use("/leave",  leaveRoutes);
+    apiRouter.use("/report",  reportRoutes);
     // -->
 
     // Start server (optional - could move to index.js)

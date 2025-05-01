@@ -110,64 +110,68 @@ export const getLeave = async (req, res) => {
   const offset = (page - 1) * limit;
   const whereClause = { user_id };
 
-  console.log("backend",{
+  console.log("backend", {
     status,
     type,
     rangeField,
     startDate,
     endDate,
     page,
-    limit ,
-  } );
+    limit,
+  });
 
   const attrList = [
-    [literal(`TO_CHAR("appliedOn" AT TIME ZONE 'Asia/Kolkata', 'DD Mon YYYY, HH12:MI AM')`), 'appliedOn'],  // Convert to IST
-    'leaveType',
-    'fromDate',
-    'toDate',
-    'id'
-  ]
-  
+    [
+      literal(
+        `TO_CHAR("appliedOn" AT TIME ZONE 'Asia/Kolkata', 'DD Mon YYYY, HH12:MI AM')`
+      ),
+      "appliedOnIST",
+    ], // Convert to IST
+    "leaveType",
+    "fromDate",
+    "toDate",
+    "id",
+  ];
 
   if (rangeField && startDate && endDate) {
     const from = new Date(startDate);
     const to = new Date(endDate);
-    whereClause[rangeField] = { [Op.between]: [from,to] };
+    whereClause[rangeField] = { [Op.between]: [from, to] };
   }
 
-  if (type && type !== 'null') {
+  if (type && type !== "") {
     whereClause.leaveType = type;
   }
 
   let totalEntries = null;
   let data = {};
-  let orderBy = [['appliedOn', 'DESC']];
+  let orderBy = [["appliedOn", "DESC"]];
 
   try {
     if (status === "Pending") {
-      totalEntries = await LeavePending.count({ where: { user_id: user_id } });
+      totalEntries = await LeavePending.count({ where: whereClause });
       data = await LeavePending.findAll({
         where: whereClause,
         attributes: attrList,
-        order : orderBy,
+        order: orderBy,
         limit: limit,
         offset: offset,
       });
     } else if (status === "Approved") {
-      totalEntries = await LeaveApproved.count({ where: { user_id: user_id } });
+      totalEntries = await LeaveApproved.count({ where: whereClause});
       data = await LeaveApproved.findAll({
         where: whereClause,
         attributes: attrList,
-        order : orderBy,
+        order: orderBy,
         limit: limit,
         offset: offset,
       });
     } else if (status === "Rejected") {
-      totalEntries = await LeaveRejected.count({ where: { user_id: user_id } });
+      totalEntries = await LeaveRejected.count({ where: whereClause });
       data = await LeavePending.findAll({
         where: whereClause,
         attributes: attrList,
-        order : orderBy,
+        order: orderBy,
         limit: limit,
         offset: offset,
       });
@@ -176,7 +180,6 @@ export const getLeave = async (req, res) => {
     }
 
     console.log(data);
-    
 
     const totalPages = Math.ceil(totalEntries / limit);
 
@@ -255,9 +258,11 @@ export const postAppliedLeave = async (req, res) => {
 };
 
 export const postCancelPending = async (req, res) => {
-  // const user_id = req.session.user.user_id;
-  const user_id = req.query.user_id;
-  const { leaveIds } = req.body;
+  const user_id = req.session.user.user_id;
+  // const user_id = req.query.user_id;
+  const leaveIds = req.body;
+  console.log("Leave Ids", leaveIds);
+  
   try {
     const leaves = await LeavePending.findAll({
       where: {
@@ -277,10 +282,10 @@ export const postCancelPending = async (req, res) => {
       fromPlusOne.setDate(fromPlusOne.getDate() + 1);
 
       if (today < fromPlusOne) {
-        // console.log("to cancel " + leave.id);
+        console.log("to cancel " + leave.id);
         toCancel.push(leave.id);
       } else {
-        // console.log("not cancel " + leave.id);
+        console.log("not cancel " + leave.id);
         notCanceled.push(leave.id);
       }
     }
@@ -299,7 +304,7 @@ export const postCancelPending = async (req, res) => {
       notCanceled,
     });
   } catch (error) {
-    console.error(error);
+    console.log(error);
     return res.status(500).send(parseError(error));
   }
 };
@@ -344,3 +349,20 @@ export const getRecentLeaves = async (req, res) => {
     return res.status(500).send(parseError(error));
   }
 };
+
+
+export const approveLeaves = async (req,res) =>{
+  try {
+    const leaveIds = req.body;
+    
+    
+  } catch (error) {
+    
+  }
+};
+
+export const rejectLeaves = async (req,res) => {};
+
+export const grantCpl = async (req,res) => {};
+
+export const getLeaveHistory = async (req,res) => {};

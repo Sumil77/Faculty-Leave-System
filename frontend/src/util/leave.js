@@ -76,3 +76,20 @@ export const getLeaves = async (query) => {
   const data = await response.json();
   return data; // assuming backend returns { leaves: [], total: number }
 };
+
+export const cancelLeaves = async (leaveIds) => {
+  try {
+    const response = await fetch("/api/leave/cancelPending", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(leaveIds) ,
+      credentials: "include",
+    });
+    return response;
+  } catch (error) {
+    console.error(error);
+    throw new Error("Failed to cancel Leaves");
+  }
+};

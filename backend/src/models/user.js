@@ -3,10 +3,10 @@ import { sequelize } from "../config.js"; // your sequelize instance
 
 class User extends Model {
   // Static method to check field uniqueness
-  static async doesNotExist(field) {
-    const count = await User.count({ where: field });
-    return count === 0;
-  }
+  // static async doesNotExist(field) {
+  //   const count = await User.count({ where: field });
+  //   return count === 0;
+  // }
 }
 
 User.init(
@@ -59,12 +59,15 @@ User.init(
       type: DataTypes.BIGINT,
       allowNull: false,
     },
+    dateOfJoining: {
+      type: DataTypes.DATEONLY,
+      allowNull: false,
+    },
   },
   {
     sequelize,
     modelName: "User",
     timestamps: true,
-    hooks: {},
   }
 );
 

@@ -87,7 +87,7 @@ const ApplyLeave = () => {
   };
 
   // Handle submit logic
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
     if (new Date(leaveDurationFrom) > new Date(leaveDurationTo)) {
@@ -175,7 +175,7 @@ const ApplyLeave = () => {
     };
 
 
-    leaveController.postLeavePending(leave)
+    await leaveController.postLeavePending(leave)
 
     setIsCancelEnabled(true);
     setTimeout(() => setIsCancelEnabled(false), 15 * 60 * 1000);

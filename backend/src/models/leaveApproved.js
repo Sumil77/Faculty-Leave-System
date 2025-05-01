@@ -16,31 +16,41 @@ LeaveApproved.init(
       allowNull: false,
     },
     appliedOn: {
-        type: DataTypes.DATE,
-        allowNull:false,
+      type: DataTypes.DATE,
+      allowNull: false,
     },
-    fromDate:{
-        type:DataTypes.DATEONLY,
-        allowNull: false
+    fromDate: {
+      type: DataTypes.DATEONLY,
+      allowNull: false,
     },
-    toDate:{
-        type:DataTypes.DATEONLY,
-        allowNull:false
+    toDate: {
+      type: DataTypes.DATEONLY,
+      allowNull: false,
     },
-    leaveType:{
-        type:DataTypes.STRING,
-        allowNull: false
+    totalDays: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
     },
-    dept:{
-        type:DataTypes.STRING,
-        allowNull:false
-    }
+    leaveType: {
+      type: DataTypes.STRING,
+      allowNull: false,
+    },
+    dept: {
+      type: DataTypes.STRING,
+      allowNull: false,
+    },
   },
   {
     sequelize,
     modelName: "LeaveApproved",
     timestamps: true,
     hooks: {
+      beforeCreate: (leave) => {
+        leave.totalDays =
+          (new Date(leave.toDate) - new Date(leave.fromDate)) /
+            (1000 * 60 * 60 * 24) +
+          1;
+      },
     },
   }
 );
