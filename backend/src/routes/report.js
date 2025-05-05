@@ -12,6 +12,9 @@ const reportRouter = express.Router()
 
 reportRouter.get("", reportController.getReport)
 reportRouter.get("/download", reportController.downloadReport)
+reportRouter.get("/leave-history", reportController.getLeaveHistory)
+reportRouter.get("/download-history", reportController.downloadHistory)
+reportRouter.post("/send-history-mail", reportController.sendHistoryMail)
 reportRouter.post("/send-mail", reportController.sendMail)
 
 
