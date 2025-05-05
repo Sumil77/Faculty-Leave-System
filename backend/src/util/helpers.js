@@ -61,4 +61,30 @@ export const createUser = async (req, res) => {
   }
 };
 
-export const updateUser = async (req,res) =>{}
+export const updateUser = async (req, res) => {
+  // const user_id = req.session.user.user_id;
+  const user_id = req.query.userId;
+  const { fields } = req.body;
+  const allowedFields = ["name", "desig", "dept", "phno"];
+  const updates = Object.keys(fields);
+
+  try {
+    const isValidFields = updates.every((field) =>
+      allowedFields.includes(field)
+    );
+    if (!isValidFields) {
+      return res.status(400).send("Invalid Fields in update");
+    }
+
+    console.log("UserId: ", user_id);
+    
+    const user = await User.findByPk(user_id);
+    console.log(user);
+    
+    await user.update(fields);
+    return res.status(200).send(user);
+  } catch (error) {
+    console.log(error);
+    return res.status(401).send(parseError(error));
+  }
+};

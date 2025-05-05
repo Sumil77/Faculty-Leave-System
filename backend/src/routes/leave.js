@@ -27,7 +27,4 @@ leaveRouter.post("/reject", leaveController.rejectLeaves);
 
 leaveRouter.post("/grant-cpl" , leaveController.grantCpl);
 
-leaveRouter.get("/history", leaveController.getLeaveHistory);
-
-
 export default leaveRouter;

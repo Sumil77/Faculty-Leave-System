@@ -88,6 +88,74 @@ END;
 $$ LANGUAGE plpgsql;
 
 
+CREATE OR REPLACE FUNCTION get_leave_history_json(
+    p_user_ids INT[] DEFAULT NULL,
+    p_dept TEXT DEFAULT NULL,
+    p_from DATE DEFAULT NULL,
+    p_to DATE DEFAULT NULL,
+    p_leave_type TEXT DEFAULT NULL
+)
+RETURNS JSON AS $$
+DECLARE
+    filter_sql TEXT := '';
+    dyn_sql TEXT;
+    result JSON;
+BEGIN
+    -- Step 1: Build filters
+    IF p_user_ids IS NOT NULL THEN
+        filter_sql := filter_sql || format(' AND l.user_id = ANY (ARRAY[%s])', array_to_string(p_user_ids, ','));
+    END IF;
+    IF p_dept IS NOT NULL THEN
+        filter_sql := filter_sql || format(' AND u.dept = %L', p_dept);
+    END IF;
+    IF p_from IS NOT NULL THEN
+        filter_sql := filter_sql || format(' AND l."fromDate" >= %L', p_from);
+    END IF;
+    IF p_to IS NOT NULL THEN
+        filter_sql := filter_sql || format(' AND l."toDate" <= %L', p_to);
+    END IF;
+    IF p_leave_type IS NOT NULL THEN
+        filter_sql := filter_sql || format(' AND l."leaveType" = %L', p_leave_type);
+    END IF;
+
+    -- Step 2: Dynamic SQL for grouped JSON
+    dyn_sql := format($q$
+        SELECT json_agg(user_data) FROM (
+            SELECT 
+                u.user_id,
+                u.name,
+                u.designation,
+                (
+                    SELECT json_agg(row_to_json(leave_row))
+                    FROM (
+                        SELECT 
+                            l."appliedOn",
+                            l."fromDate",
+                            l."toDate",
+                            l."leaveType",
+                            l."totalDays",
+                            l."dept"
+                        FROM public."LeaveApproved" l
+                        WHERE l.user_id = u.user_id %s
+                        ORDER BY l."fromDate"
+                    ) AS leave_row
+                ) AS leaves
+            FROM public."User" u
+            WHERE EXISTS (
+                SELECT 1 FROM public."LeaveApproved" l
+                WHERE l.user_id = u.user_id %s
+            )
+            ORDER BY u.name
+        ) AS user_data
+    $q$, filter_sql, filter_sql);
+
+    -- Step 3: Execute
+    EXECUTE dyn_sql INTO result;
+
+    RETURN result;
+END;
+$$ LANGUAGE plpgsql;
+
 
 drop function get_dynamic_leave_summary();
 

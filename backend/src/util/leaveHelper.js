@@ -3,12 +3,14 @@ import LeaveRejected from "../models/leaveRejected.js";
 import LeavePending from "../models/leavePending.js";
 import LeaveBalance from "../models/leaveBalance.js";
 import LeaveTaken from "../models/leaveTaken.js";
+import CompensatoryLeave from "../models/CompensatoryLeave.js";
 import { parseError } from "./helpers.js";
 import { col, fn, literal, Op } from "sequelize";
 import {
   leaveSchema,
   validateLeaveBalance,
 } from "../validations/leaveValidations.js";
+import { sequelize } from "../config.js";
 
 export const getLeaveApproved = async (req, res) => {
   const user_id = req.session.user.user_id;
@@ -158,7 +160,7 @@ export const getLeave = async (req, res) => {
         offset: offset,
       });
     } else if (status === "Approved") {
-      totalEntries = await LeaveApproved.count({ where: whereClause});
+      totalEntries = await LeaveApproved.count({ where: whereClause });
       data = await LeaveApproved.findAll({
         where: whereClause,
         attributes: attrList,
@@ -262,7 +264,7 @@ export const postCancelPending = async (req, res) => {
   // const user_id = req.query.user_id;
   const leaveIds = req.body;
   console.log("Leave Ids", leaveIds);
-  
+
   try {
     const leaves = await LeavePending.findAll({
       where: {
@@ -350,19 +352,115 @@ export const getRecentLeaves = async (req, res) => {
   }
 };
 
+export const approveLeaves = async (req, res) => {
+  const transaction = await sequelize.transaction();
 
-export const approveLeaves = async (req,res) =>{
+  const { leaveIds } = req.body;
+  console.log("Approve leaves: ", leaveIds);
   try {
-    const leaveIds = req.body;
-    
-    
+    const toApprove = await LeavePending.findAll({
+      where: {
+        id: { [Op.in]: leaveIds },
+      },
+      transaction,
+      lock: true,
+    });
+
+    if (toApprove.length === 0) {
+      await transaction.rollback();
+      return res
+        .status(404)
+        .json({ error: "No matching pending leaves found" });
+    }
+
+    const approvedData = toApprove.map((leave) => leave.toJSON());
+    await LeaveApproved.bulkCreate(approvedData, transaction);
+    await LeavePending.destroy({
+      where: { id: { [Op.in]: leaveIds } },
+      transaction,
+    });
+
+    await transaction.commit();
+
+    res.status(200).json({
+      success: true,
+      message: `${toApprove.length} leave(s) approved.`,
+    });
   } catch (error) {
-    
+    await transaction.rollback();
+    console.log("Approve Transaction Failed", error);
+    return res.status(400).send(parseError(error));
   }
 };
 
-export const rejectLeaves = async (req,res) => {};
+export const rejectLeaves = async (req, res) => {
+  const transaction = await sequelize.transaction();
 
-export const grantCpl = async (req,res) => {};
+  const { leaveIds } = req.body;
+  console.log("Approve leaves: ", leaveIds);
+  try {
+    const toReject = await LeavePending.findAll({
+      where: {
+        id: { [Op.in]: leaveIds },
+      },
+      transaction,
+      lock: true,
+    });
 
-export const getLeaveHistory = async (req,res) => {};
+    if (toApprove.length === 0) {
+      await transaction.rollback();
+      return res
+        .status(404)
+        .json({ error: "No matching pending leaves found" });
+    }
+
+    const approvedData = toApprove.map((leave) => leave.toJSON());
+    await LeaveRejected.bulkCreate(approvedData, transaction);
+    await LeavePending.destroy({
+      where: { id: { [Op.in]: leaveIds } },
+      transaction,
+    });
+
+    await transaction.commit();
+
+    res.status(200).json({
+      success: true,
+      message: `${toApprove.length} leave(s) rejected.`,
+    });
+  } catch (error) {
+    await transaction.rollback();
+    console.log("Reject Transaction Failed", error);
+    return res.status(400).send(parseError(error));
+  }
+};
+
+export const grantCpl = async (req, res) => {
+  // const grantedBy = req.session.user.user_id;
+  const transaction = await sequelize.transaction();
+  const grantedBy = req.body.grantedBy;
+  const grants = req.body.grants;
+  try {
+    for (const { userId, days, reason } of grants) {
+      await LeaveBalance.increment(
+        { compensatory: days },
+        { where: { user_id: userId }, transaction }
+      );
+
+      await CompensatoryLeave.create({
+        user_id: userId,
+        days: days,
+        reason: reason,
+        grantedBy: grantedBy,
+        grantedOn: new Date(),
+      });
+    }
+
+    await transaction.commit();
+    return res.status(200).send("Granted Compensatory Leaves Successfully");
+  } catch (error) {
+    await transaction.rollback();
+    console.log(error);
+    
+    return res.status(400).send(parseError(error));
+  }
+};
