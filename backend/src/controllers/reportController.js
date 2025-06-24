@@ -1,10 +1,10 @@
 import { sequelize } from "../config.js";
-import { parseError } from "./helpers.js";
+import { parseError } from "./userController.js";
 import ExcelJS from "exceljs";
 import { stringify } from "csv-stringify/sync";
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 import nodemailer from "nodemailer";
-import { leaveTypes } from "../validations/leaveValidations.js";
+import { leaveTypes } from "../validators/leaveValidations.js";
 import { EMAIL_PASS, EMAIL_USER } from "../config.js";
 
 const transporter = nodemailer.createTransport({

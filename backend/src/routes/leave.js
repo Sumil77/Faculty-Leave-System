@@ -1,5 +1,5 @@
 import express from "express";
-import * as leaveController from "../util/leaveHelper.js";
+import * as leaveController from "../controllers/leaveController.js";
 
 const leaveRouter = express.Router();
 

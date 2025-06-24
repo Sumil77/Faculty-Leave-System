@@ -3,6 +3,7 @@
     "dev": "npm --prefix frontend run dev",
     "dev:back": "npm --prefix frontend run prod",
     "prod": "concurrently \"npm --prefix backend run dev\" \"npm --prefix frontend run prod\""
+    "build": "concurrently \"npm --prefix backend run dev\" \"npm --prefix frontend run build\""
   },
   "devDependencies": {
     "concurrently": "^8.0.0"
