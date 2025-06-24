@@ -12,11 +12,6 @@ export const parseError = (err) => {
   return { message: "An unknown error occurred" };
 };
 
-export const sessionizeUser = (cred) => {
-  // const {user_id, name,  dept} = Credentials.find({where : cred.email});
-  return { user_id: 123, userName: "sumil", dept: "CSE" };
-};
-
 export const getUser = async (req, res) => {
   try {
     const user_id = req.session.user.user_id;

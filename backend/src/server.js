@@ -5,7 +5,7 @@ import { userRoutes, sessionRoutes, leaveRoutes , reportRoutes} from "./routes/i
 import session from "express-session";
 import pgSession from "connect-pg-simple";
 import user from "./models/user.js"
-// import requireAuth from "./util/sessionexpire.js";
+import requireAuth from "./middlewares/authSession.js";
 import {
   PORT,
   NODE_ENV,

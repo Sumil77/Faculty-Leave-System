@@ -4,12 +4,12 @@ import LeavePending from "../models/leavePending.js";
 import LeaveBalance from "../models/leaveBalance.js";
 import LeaveTaken from "../models/leaveTaken.js";
 import CompensatoryLeave from "../models/CompensatoryLeave.js";
-import { parseError } from "./helpers.js";
+import { parseError } from "./userController.js";
 import { col, fn, literal, Op } from "sequelize";
 import {
   leaveSchema,
   validateLeaveBalance,
-} from "../validations/leaveValidations.js";
+} from "../validators/leaveValidations.js";
 import { sequelize } from "../config.js";
 
 export const getLeaveApproved = async (req, res) => {
@@ -261,19 +261,19 @@ export const postAppliedLeave = async (req, res) => {
 
 export const postCancelPending = async (req, res) => {
   const user_id = req.session.user.user_id;
-  // const user_id = req.query.user_id;
   const leaveIds = req.body;
-  console.log("Leave Ids", leaveIds);
 
+  const transaction = await sequelize.transaction();
   try {
     const leaves = await LeavePending.findAll({
       where: {
         id: { [Op.in]: leaveIds },
         user_id,
       },
+      lock: transaction.LOCK.UPDATE,
+      transaction,
     });
 
-    console.log(leaves.map((l) => l.id));
     const today = new Date();
     const toCancel = [];
     const notCanceled = [];
@@ -284,10 +284,8 @@ export const postCancelPending = async (req, res) => {
       fromPlusOne.setDate(fromPlusOne.getDate() + 1);
 
       if (today < fromPlusOne) {
-        console.log("to cancel " + leave.id);
         toCancel.push(leave.id);
       } else {
-        console.log("not cancel " + leave.id);
         notCanceled.push(leave.id);
       }
     }
@@ -298,15 +296,19 @@ export const postCancelPending = async (req, res) => {
           id: { [Op.in]: toCancel },
           user_id,
         },
+        transaction,
       });
     }
+
+    await transaction.commit();
 
     return res.status(200).json({
       cancelled: toCancel,
       notCanceled,
     });
   } catch (error) {
-    console.log(error);
+    await transaction.rollback();
+    console.log("Cancel Leave Failed:", error);
     return res.status(500).send(parseError(error));
   }
 };
@@ -374,7 +376,7 @@ export const approveLeaves = async (req, res) => {
     }
 
     const approvedData = toApprove.map((leave) => leave.toJSON());
-    await LeaveApproved.bulkCreate(approvedData, transaction);
+    await LeaveApproved.bulkCreate(approvedData, { transaction });
     await LeavePending.destroy({
       where: { id: { [Op.in]: leaveIds } },
       transaction,
@@ -460,7 +462,7 @@ export const grantCpl = async (req, res) => {
   } catch (error) {
     await transaction.rollback();
     console.log(error);
-    
+
     return res.status(400).send(parseError(error));
   }
 };
