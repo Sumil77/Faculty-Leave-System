@@ -1,5 +1,5 @@
 import { signIn } from "../validators/userValidations.js";
-import { parseError, sessionizeUser } from "../controllers/userController.js";
+import { parseError } from "../controllers/userController.js";
 import { SESS_NAME } from "../config.js";
 import Credentials from "../models/credentials.js";
 
