@@ -21,6 +21,8 @@ export const getRecent = async () => {
     credentials: "include", // Include cookies for session
   });
   const data = response.json();
+  console.log(data);
+  
   return data;
 };
 

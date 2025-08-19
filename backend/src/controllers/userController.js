@@ -41,11 +41,11 @@ export const getUser = async (req, res) => {
 
 export const createUser = async (req, res) => {
   try {
-    const { user_id, email, password } = req.body;
+    const { user_id, email, password, role, status } = req.body;
 
     // await signUp.validateAsync({ user_id, email, password });
 
-    const newUser = await Credentials.create({ user_id, email, password });
+    const newUser = await Credentials.create({ user_id, email, password, role, status });
 
     res.status(201).send("User created");
   } catch (err) {
