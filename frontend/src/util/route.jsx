@@ -1,17 +1,13 @@
 import React, { useEffect, useState } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { Navigate, useLocation, Outlet } from "react-router-dom";
-import { logout , receiveCurrentUser } from "../actions/session";
-
-// <-- REMOVE IN PRODUCTION
-const isBypassAuth = import.meta.env.VITE_BYPASS_AUTH === "true";
-// -->
+import { logout, receiveCurrentUser } from "../actions/session";
 
 export const AuthRoute = ({ children }) => {
   const loggedIn = useSelector((state) => Boolean(state.session.user_id));
   const location = useLocation();
 
-  if (loggedIn && !isBypassAuth) {
+  if (loggedIn) {
     return <Navigate to="/dashboard" state={{ from: location }} replace />;
   }
 
@@ -25,18 +21,9 @@ export const ProtectedRoute = ({ children }) => {
   const location = useLocation();
 
   const validateSession = async () => {
-    console.log(isBypassAuth);
-    
-    // <-- REMOVE IN PRODUCTION
-    if (isBypassAuth) {
-      setChecking(false);
-      return;
-    }
-    // -->
-
     try {
       const res = await fetch("/api/session", {
-        credentials: "include", // send cookies
+        credentials: "include",
       });
       const data = await res.json();
 
@@ -53,23 +40,23 @@ export const ProtectedRoute = ({ children }) => {
   };
 
   useEffect(() => {
-    // Initial session check
     setChecking(true);
     validateSession();
+  }, [location.pathname, dispatch]);
 
-  }, [location.pathname,dispatch]);
-
-  if (checking) return <div>Loading...</div>;
+  if (checking) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <p>Checking session...</p>
+      </div>
+    );
+  }
 
   if (!loggedIn) {
-    console.log(loggedIn);
-    
     return <Navigate to="/login" replace />;
   }
 
   return children ? children : <Outlet />;
 };
-
-
 
 export default { AuthRoute, ProtectedRoute };

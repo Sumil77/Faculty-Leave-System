@@ -185,9 +185,9 @@ const Dashboard = () => {
         </div>
 
         {/* ID Card */}
-        <div className="lg:ml-auto mt-6 lg:mt-0">
+        {/* <div className="lg:ml-auto mt-6 lg:mt-0">
           <IDCard faculty={facultyData} />
-        </div>
+        </div> */}
       </div>
 
       {/* Leave Balances Section */}

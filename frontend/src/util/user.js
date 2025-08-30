@@ -4,7 +4,7 @@ export const getUser = async () => {
       method: "GET",
       credentials: "include",
     });
-    const data = response.json();
+    const data = await response.json();
     console.log(data);
     
     return data;
