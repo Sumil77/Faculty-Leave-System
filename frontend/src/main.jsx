@@ -5,23 +5,17 @@ import configureStore from './store/store';
 import { Provider } from "react-redux";
 import "./styles/index.css";
 import { BrowserRouter } from "react-router-dom";
-import rootReducer from "./reducers/root.js"
-// import { checkLoggedIn } from "./util/session";
 
-// <-- REMOVE IN PRODUCTION 
-const isBypassAuth = import.meta.env.VITE_BYPASS_AUTH;
-const mockSession = {
-    user_id: "123",
-    username: "DevUser",
-};
+// ✅ Start MSW in dev/mock mode
+if (import.meta.env.VITE_USE_MSW === "true") {
+  const { worker } = await import("./mocks/browser");
+  await worker.start({
+    onUnhandledRequest: "bypass",
+    serviceWorker: { url: "/mockServiceWorker.js" },
+  });
+}
 
-const mockState = (isBypassAuth === "true") ? {session : mockSession} : undefined;
-
-const store = configureStore(mockState);
-console.log(isBypassAuth);
-console.log(store.getState());
-// -->
-
+const store = configureStore();
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <BrowserRouter>
@@ -30,7 +24,3 @@ ReactDOM.createRoot(document.getElementById("root")).render(
     </Provider>
   </BrowserRouter>
 );
-
-// <-- REMOVE IN PRODUCTION
-window.getState = store.getState;
-//  -->
