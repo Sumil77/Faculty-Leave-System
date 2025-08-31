@@ -2,9 +2,13 @@ import React from "react";
 import { FaPhoneAlt, FaEnvelope } from "react-icons/fa";
 import profilePic from "../assets/profile.avif";
 
-const IDCard = ({faculty}) => {
-  console.log(faculty);
-  
+const IDCard = ({ faculty }) => {
+  console.log("IDCard rendered with:", faculty);
+
+  if (!faculty) {
+    return <div>Loading ID Card...</div>;
+  }
+
   return (
     <div className="relative bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500 w-[450px] p-8 rounded-3xl shadow-xl flex flex-row items-center space-x-6 hover:scale-105 transition-transform duration-300 ease-in-out mx-auto mb-10">
       {/* Left side (text information) */}

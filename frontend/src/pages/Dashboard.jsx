@@ -4,7 +4,7 @@ import * as leaveController from "../util/leave.js";
 import * as userController from "../util/user.js"
 import { FaRegCalendarAlt, FaRegHandPaper, FaHospital, FaUserShield, FaRegClock } from "react-icons/fa";
 
-const facultyData = await userController.getUser();
+console.log("Dashboard rendered");
 
 const leaveObj = leaveController.leaveTypes;
 
@@ -49,6 +49,7 @@ const formatDate = (dateString) => {
 };
 
 const Dashboard = () => {
+  const [facultyData, setFacultyData] = useState(null);
   const [yearFilter, setYearFilter] = useState("All");
   const [monthFilter, setMonthFilter] = useState("All");
   const [recentLeaves, setRecentLeaves] = useState([]);
@@ -57,6 +58,8 @@ const Dashboard = () => {
 
 
   useEffect(() => {
+    console.log("useEffect fired");
+    
     const fetchLeaveBalance = async () => {
       const data = await leaveController.getLeaveBalance();
       if (Array.isArray(data) && data.length > 0) {
@@ -69,7 +72,18 @@ const Dashboard = () => {
       const data = await leaveController.getRecent();
       setRecentLeaves(data);
     };
+    const fetchUser = async () => {
+      console.log("fetchUser called");
+      try {
+        const u = await userController.getUser();
+        console.log("userController response:", u);
+        setFacultyData(u);
+      } catch (err) {
+        console.error("Error fetching user:", err);
+      }
+    };
 
+    fetchUser();
     fetchLeaveBalance();
     fetchRecentLeaves();
 
@@ -185,9 +199,9 @@ const Dashboard = () => {
         </div>
 
         {/* ID Card */}
-        {/* <div className="lg:ml-auto mt-6 lg:mt-0">
-          <IDCard faculty={facultyData} />
-        </div> */}
+        <div className="lg:ml-auto mt-6 lg:mt-0">
+          {facultyData && <IDCard faculty={facultyData} />}
+        </div>
       </div>
 
       {/* Leave Balances Section */}

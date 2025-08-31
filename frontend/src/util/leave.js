@@ -20,7 +20,7 @@ export const getRecent = async () => {
     method: "GET",
     credentials: "include", // Include cookies for session
   });
-  const data = response.json();
+  const data = await response.json();
   console.log(data);
   
   return data;
