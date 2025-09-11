@@ -1,13 +1,12 @@
+import { apiRequest } from "./api.js";
+
 export const leaveTypes = {
   casual: { fullName: "Casual Leave", acronym: "CL" },
   medical: { fullName: "Medical Leave", acronym: "ML" },
   specialCasual: { fullName: "Special Casual Leave", acronym: "SCL" },
   extraOrdinary: { fullName: "Extra Ordinary Leave", acronym: "EOL" },
   earned: { fullName: "Earned Leave", acronym: "EL" },
-  onDutyExam: {
-    fullName: "On Duty(Exam) ",
-    acronym: "OD-Exam",
-  },
+  onDutyExam: { fullName: "On Duty(Exam)", acronym: "OD-Exam" },
   onDutyOther: { fullName: "On Duty(Other)", acronym: "OD-Other" },
   maternity: { fullName: "Maternity Leave", acronym: "MLv" },
   election: { fullName: "Election Leave", acronym: "ELE" },
@@ -16,82 +15,39 @@ export const leaveTypes = {
 };
 
 export const getRecent = async () => {
-  const response = await fetch("/api/leave/recent", {
-    method: "GET",
-    credentials: "include", // Include cookies for session
-  });
-  const data = await response.json();
-  console.log(data);
-  
-  return data;
+  return apiRequest("/api/leave/recent", { method: "GET" });
 };
 
 export const getLeaveBalance = async () => {
-  const response = await fetch("/api/leave/balance", {
-    method: "GET",
-    credentials: "include",
-  });
-  const data = response.json();
-  console.log(data);
-
-  return data;
+  return apiRequest("/api/leave/balance", { method: "GET" });
 };
 
 export const postLeavePending = async (leave) => {
-  console.log(leave);
-
-  const response = await fetch("/api/leave/apply", {
+  return apiRequest("/api/leave/apply", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(leave),
-    credentials: "include",
+    body: leave,
   });
-  const data = response.json();
-  return data;
 };
 
 export const getLeaves = async (query) => {
-  console.log("getLeave: ", query);
   const params = new URLSearchParams({
-    status: query.statusFilter,
-    type: query.typeFilter,
-    startDate: query.startDate,
-    endDate: query.endDate,
-    rangeField: query.rangeField,
-    page: query.page,
-    limit: query.limit,
+    status: query.statusFilter || "",
+    type: query.typeFilter || "",
+    startDate: query.startDate || "",
+    endDate: query.endDate || "",
+    rangeField: query.rangeField || "appliedOn",
+    page: query.page || 1,
+    limit: query.limit || 10,
   });
 
-  const response = await fetch(`/api/leave/getLeave?${params.toString()}`, {
+  return apiRequest(`/api/leave/getLeave?${params.toString()}`, {
     method: "GET",
-    headers: {
-      "Content-Type": "application/json",
-    },
   });
-
-  if (!response.ok) {
-    throw new Error("Failed to fetch leaves");
-  }
-
-  const data = await response.json();
-  return data; // assuming backend returns { leaves: [], total: number }
 };
 
 export const cancelLeaves = async (leaveIds) => {
-  try {
-    const response = await fetch("/api/leave/cancelPending", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(leaveIds) ,
-      credentials: "include",
-    });
-    return response;
-  } catch (error) {
-    console.error(error);
-    throw new Error("Failed to cancel Leaves");
-  }
+  return apiRequest("/api/leave/cancelPending", {
+    method: "POST",
+    body: leaveIds,
+  });
 };

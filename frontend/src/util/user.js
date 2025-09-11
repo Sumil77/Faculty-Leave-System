@@ -1,14 +1,7 @@
-export const getUser = async () => {
-  try {
-    const response = await fetch("/api/users/me", {
-      method: "GET",
-      credentials: "include",
-    });
-    const data = await response.json();
-    console.log(data);
-    
-    return data;
-  } catch (error) {
-    console.error(error);
-  }
+import { apiRequest } from "./api.js";
+
+export const getUser = () => {
+  return apiRequest("/api/users/me", {
+    method: "GET",
+  });
 };
