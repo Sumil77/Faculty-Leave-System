@@ -11,6 +11,8 @@ import { AuthRoute, ProtectedRoute } from "../util/route.jsx";
 import AdminRequests from "../pages/AdminRequests";
 import AdminUsers from "../pages/AdminUsers";
 import AdminReports from "../pages/AdminReports";
+import ReportGenerator from "../pages/ReportGenerator";
+
 
 const AppRoutes = () => {
   return (
@@ -23,6 +25,7 @@ const AppRoutes = () => {
         <Route path="/admin-panel/requests" element={<AdminRequests />} />
         <Route path="/admin-panel/users" element={<AdminUsers />} />
         <Route path="/admin-panel/reports" element={<AdminReports />} />
+        <Route path="/admin/reports/generator" element={<ReportGenerator />} />
       </Route>
 
       <Route element={<AuthRoute />}>

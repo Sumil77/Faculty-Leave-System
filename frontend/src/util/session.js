@@ -1,29 +1,24 @@
-export const signup = (user) =>
-  fetch("api/users", {
-    method: "POST",
-    body: JSON.stringify(user),
-    headers: {
-      "Content-Type": "application/json",
-    },
-  });
+import { apiRequest } from "./api.js";
 
-export const login = (user) =>
-  fetch("api/session", {
+export const signup = (user) => {
+  return apiRequest("/api/users", {
     method: "POST",
-    body: JSON.stringify(user),
-    headers: {
-      "Content-Type": "application/json",
-    },
+    body: user,
   });
-
-export const logout = async () => {
-  const response = await fetch("/api/session", {
-    method: "DELETE",
-    credentials: "include", // Include cookies for session
-  });
-  return response;
 };
 
+export const login = (user) => {
+  return apiRequest("/api/session", {
+    method: "POST",
+    body: user,
+  });
+};
+
+export const logout = () => {
+  return apiRequest("/api/session", {
+    method: "DELETE",
+  });
+};
 
 
 // export const checkLoggedIn = async (preloadedState) => {
