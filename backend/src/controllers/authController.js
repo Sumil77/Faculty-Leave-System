@@ -1,11 +1,20 @@
 import { signIn } from "../validators/userValidations.js";
 import { parseError } from "../controllers/userController.js";
 import { SESS_NAME } from "../config.js";
-import Credentials from "../models/credentials.js";
+import { Credentials, Admin } from "../models/index.js";
 
 const sessionizeUser = (cred) => {
-  // const {user_id, name,  dept} = Credentials.find({where : cred.email});
-  return { user_id: 123, userName: "sumil", dept: "CSE" };
+  /*const sessionizeUser = async (cred) => {
+    const isAdmin = await Admin.findOne({ where: { user_id: cred.user_id } });
+    return {
+      user_id: cred.user_id,
+      userName: cred.name,
+      dept: cred.dept,
+      isAdmin: !!isAdmin, // true if found
+    };
+  };*/
+
+  return { user_id: 123, userName: "sumil", dept: "CSE", isAdmin : true };
 };
 
 export const login = async (req, res) => {
@@ -17,8 +26,6 @@ export const login = async (req, res) => {
       return res.status(400).send(parseError(error));
     }
     const user = await Credentials.findOne({ where: { email } });
-    console.log(user);
-    
     if (user && user.comparePasswords(password)) {
       const sessionUser = sessionizeUser(user);
       req.session.user = sessionUser;
@@ -30,7 +37,7 @@ export const login = async (req, res) => {
     console.log(err);
     return res.status(401).send(parseError(err));
   }
-}
+};
 
 export const logout = ({ session }, res) => {
   if (session?.user) {
@@ -49,7 +56,7 @@ export const logout = ({ session }, res) => {
       .status(200)
       .send({ message: "No session found, but you're logged out" });
   }
-}
+};
 
 export const getSession = async (req, res) => {
   const { user, cookie } = req.session;
@@ -71,4 +78,4 @@ export const getSession = async (req, res) => {
   } else {
     return res.status(200).send({ user });
   }
-}
+};

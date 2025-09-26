@@ -58,37 +58,24 @@ const Dashboard = () => {
 
 
   useEffect(() => {
-    console.log("useEffect fired");
-    
-    const fetchLeaveBalance = async () => {
-      const data = await leaveController.getLeaveBalance();
-      if (Array.isArray(data) && data.length > 0) {
-
-        setLeaveBalance(data[0]); // extract the actual data
-      }
-    };
-
-    const fetchRecentLeaves = async () => {
-      const data = await leaveController.getRecent();
-      setRecentLeaves(data);
-    };
-    const fetchUser = async () => {
-      console.log("fetchUser called");
+    const fetchAll = async () => {
       try {
-        const u = await userController.getUser();
-        console.log("userController response:", u);
-        setFacultyData(u);
+        const user = await userController.getUser();
+        setFacultyData(user);
+
+        const leaveBalanceData = await leaveController.getLeaveBalance();
+        setLeaveBalance(Array.isArray(leaveBalanceData) ? leaveBalanceData[0] : leaveBalanceData);
+
+        const recentLeavesData = await leaveController.getRecent();
+        setRecentLeaves(recentLeavesData);
       } catch (err) {
-        console.error("Error fetching user:", err);
+        console.error(err);
       }
     };
 
-    fetchUser();
-    fetchLeaveBalance();
-    fetchRecentLeaves();
-
-
+    fetchAll();
   }, []);
+
 
   const getFilteredLeaves = () => {
     let filtered = [...recentLeaves];
@@ -121,6 +108,10 @@ const Dashboard = () => {
     "January", "February", "March", "April", "May", "June",
     "July", "August", "September", "October", "November", "December",
   ];
+
+  if (!facultyData) {
+    return <div className="flex justify-center items-center h-screen">Loading...</div>;
+  }
 
   return (
     <div className="min-h-screen bg-gray-100">

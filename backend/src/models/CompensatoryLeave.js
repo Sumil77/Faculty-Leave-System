@@ -1,5 +1,6 @@
 import { DataTypes, Model } from "sequelize";
 import { sequelize } from "../config.js"; // your sequelize instance
+import User from "./User.js";
 
 class CompensatoryLeave extends Model {
   // Static method to check field uniqueness
@@ -50,5 +51,6 @@ CompensatoryLeave.init(
     },
   }
 );
+
 
 export default CompensatoryLeave;

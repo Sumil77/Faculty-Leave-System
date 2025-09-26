@@ -1,33 +1,33 @@
-import { useState, useEffect, useCallback } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { useState, useEffect } from "react";
 
-export default function UserFormModal({
-  show,
-  onClose,
-  onSubmit,
-  initialData = null,
-}) {
-  const [user_id, setFacultyId] = useState("");
+export default function UserFormModal({ show, onClose, onSubmit, initialData = {}, departments: deptOptions = [], roles: roleOptions = [] }) {
+  const [user_id, setUserId] = useState("");
   const [name, setName] = useState("");
-  const [department, setDepartment] = useState("");
-  const [role, setRole] = useState("");
+  const [dept, setDept] = useState("");
+  const [desig, setDesig] = useState("");
+  const [phno, setPhno] = useState("");
+  const [dateOfJoining, setDateOfJoining] = useState("");
+  const [email, setEmail] = useState("");
   const [errors, setErrors] = useState({});
 
-  const departments = ["CSE", "ECE", "ME", "CE"];
-  const roles = ["Faculty", "Staff", "Admin"];
-
-  // Pre-fill form if editing
+  // Fill form if editing
   useEffect(() => {
     if (initialData) {
-      setFacultyId(initialData.user_Id || "");
+      setUserId(initialData.user_id || "");
       setName(initialData.name || "");
-      setDepartment(initialData.dept || "");
-      setRole(initialData.role || "");
+      setDept(initialData.dept || "");
+      setDesig(initialData.desig || "");
+      setPhno(initialData.phno || "");
+      setDateOfJoining(initialData.dateOfJoining || "");
+      setEmail(initialData.email || "");
     } else {
-      setFacultyId("");
+      setUserId("");
       setName("");
-      setDepartment("");
-      setRole("");
+      setDept("");
+      setDesig("");
+      setPhno("");
+      setDateOfJoining("");
+      setEmail("");
     }
     setErrors({});
   }, [initialData, show]);
@@ -36,8 +36,11 @@ export default function UserFormModal({
     const newErrors = {};
     if (!user_id) newErrors.user_id = "Faculty ID is required";
     if (!name) newErrors.name = "Name is required";
-    if (!department) newErrors.department = "Please select a department";
-    if (!role) newErrors.role = "Please select a role";
+    if (!dept) newErrors.dept = "Department is required";
+    if (!desig) newErrors.desig = "Role/Designation is required";
+    if (!phno) newErrors.phno = "Phone number is required";
+    if (!dateOfJoining) newErrors.dateOfJoining = "Joining date is required";
+    if (!email) newErrors.email = "Email is required";
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -45,139 +48,110 @@ export default function UserFormModal({
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!validate()) return;
-    onSubmit({ user_id, name, dept, role });
+
+    // Construct payload according to backend
+    onSubmit({ user_id, name, dept, desig, phno, dateOfJoining, email });
     onClose();
   };
 
+  if (!show) return null;
+
   return (
-    <AnimatePresence>
-      {show && (
-        <motion.div
-          className="fixed inset-0 bg-black/40 flex items-center justify-center z-50"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-        >
-          <motion.div
-            className="bg-white p-6 rounded-2xl shadow-xl w-full max-w-md relative"
-            initial={{ scale: 0.9, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0.9, opacity: 0 }}
-          >
-            <h2 className="text-xl font-bold mb-4 text-gray-800">
-              {initialData ? "Edit User" : "Add User"}
-            </h2>
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+      <div className="bg-white p-6 rounded-xl shadow-md w-full max-w-md">
+        <h2 className="text-xl font-bold mb-4">{initialData ? "Edit User" : "Add User"}</h2>
 
-            <form className="space-y-4">
-              {/* Faculty ID */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Faculty ID
-                </label>
-                <input
-                  type="text"
-                  value={user_id}
-                  onChange={(e) => setFacultyId(e.target.value)}
-                  disabled={!!initialData} // lock if editing
-                  className={`w-full border px-3 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none ${errors.user_id ? "border-red-500" : "border-gray-300"
-                    } disabled:bg-gray-100`}
-                />
-                {errors.user_id && (
-                  <p className="text-red-500 text-sm mt-1">
-                    {errors.user_id}
-                  </p>
-                )}
-              </div>
+        <form className="space-y-3">
+          <div>
+            <label className="block text-sm font-medium">Faculty ID</label>
+            <input
+              type="text"
+              value={user_id}
+              onChange={(e) => setUserId(e.target.value)}
+              disabled={!!initialData}
+              className={`w-full border px-3 py-2 rounded ${errors.user_id ? "border-red-500" : "border-gray-300"}`}
+            />
+            {errors.user_id && <p className="text-red-500 text-sm">{errors.user_id}</p>}
+          </div>
 
-              {/* Name */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Name
-                </label>
-                <input
-                  type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className={`w-full border px-3 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none ${errors.name ? "border-red-500" : "border-gray-300"
-                    }`}
-                />
-                {errors.name && (
-                  <p className="text-red-500 text-sm mt-1">{errors.name}</p>
-                )}
-              </div>
+          <div>
+            <label className="block text-sm font-medium">Name</label>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className={`w-full border px-3 py-2 rounded ${errors.name ? "border-red-500" : "border-gray-300"}`}
+            />
+            {errors.name && <p className="text-red-500 text-sm">{errors.name}</p>}
+          </div>
 
-              {/* Department */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Department
-                </label>
-                <select
-                  value={department}
-                  onChange={(e) => setDepartment(e.target.value)}
-                  className={`w-full border px-3 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none ${errors.department ? "border-red-500" : "border-gray-300"
-                    }`}
-                >
-                  <option value="">Select Department</option>
-                  {departments.map((d) => (
-                    <option key={d} value={d}>
-                      {d}
-                    </option>
-                  ))}
-                </select>
-                {errors.department && (
-                  <p className="text-red-500 text-sm mt-1">
-                    {errors.department}
-                  </p>
-                )}
-              </div>
+          <div>
+            <label className="block text-sm font-medium">Department</label>
+            <select
+              value={dept}
+              onChange={(e) => setDept(e.target.value)}
+              className={`w-full border px-3 py-2 rounded ${errors.dept ? "border-red-500" : "border-gray-300"}`}
+            >
+              <option value="">Select Department</option>
+              {deptOptions.map((d) => <option key={d} value={d}>{d}</option>)}
+            </select>
+            {errors.dept && <p className="text-red-500 text-sm">{errors.dept}</p>}
+          </div>
 
-              {/* Role */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Role
-                </label>
-                <select
-                  value={role}
-                  onChange={(e) => setRole(e.target.value)}
-                  className={`w-full border px-3 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none ${errors.role ? "border-red-500" : "border-gray-300"
-                    }`}
-                >
-                  <option value="">Select Role</option>
-                  {roles.map((r) => (
-                    <option key={r} value={r}>
-                      {r}
-                    </option>
-                  ))}
-                </select>
-                {errors.role && (
-                  <p className="text-red-500 text-sm mt-1">{errors.role}</p>
-                )}
-              </div>
+          <div>
+            <label className="block text-sm font-medium">Role/Designation</label>
+            <select
+              value={desig}
+              onChange={(e) => setDesig(e.target.value)}
+              className={`w-full border px-3 py-2 rounded ${errors.desig ? "border-red-500" : "border-gray-300"}`}
+            >
+              <option value="">Select Role</option>
+              {roleOptions.map((r) => <option key={r} value={r}>{r}</option>)}
+            </select>
+            {errors.desig && <p className="text-red-500 text-sm">{errors.desig}</p>}
+          </div>
 
-              {/* Actions */}
-              <div className="flex justify-end gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
-                >
-                  <button
-                    type="button"
-                    onClick={handleSubmit}
-                  ></button>
-                  {initialData ? "Save Changes" : "Add"}
-                </button>
-              </div>
-            </form>
-          </motion.div>
-        </motion.div>
-      )}
-    </AnimatePresence>
+          <div>
+            <label className="block text-sm font-medium">Phone Number</label>
+            <input
+              type="text"
+              value={phno}
+              onChange={(e) => setPhno(e.target.value)}
+              className={`w-full border px-3 py-2 rounded ${errors.phno ? "border-red-500" : "border-gray-300"}`}
+            />
+            {errors.phno && <p className="text-red-500 text-sm">{errors.phno}</p>}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium">Date of Joining</label>
+            <input
+              type="date"
+              value={dateOfJoining}
+              onChange={(e) => setDateOfJoining(e.target.value)}
+              className={`w-full border px-3 py-2 rounded ${errors.dateOfJoining ? "border-red-500" : "border-gray-300"}`}
+            />
+            {errors.dateOfJoining && <p className="text-red-500 text-sm">{errors.dateOfJoining}</p>}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium">Email</label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className={`w-full border px-3 py-2 rounded ${errors.email ? "border-red-500" : "border-gray-300"}`}
+            />
+            {errors.email && <p className="text-red-500 text-sm">{errors.email}</p>}
+          </div>
+
+          <div className="flex justify-end gap-3 pt-2">
+            <button type="button" onClick={onClose} className="px-4 py-2 bg-gray-200 rounded">Cancel</button>
+            <button type="button" onClick={handleSubmit} className="px-4 py-2 bg-blue-600 text-white rounded">
+              {initialData ? "Save Changes" : "Add User"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
   );
 }

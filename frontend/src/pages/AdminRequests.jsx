@@ -11,6 +11,7 @@ import {
   FiDownload,
 } from "react-icons/fi";
 import * as adminController from "../util/admin"
+import * as leaveController from "../util/leave"
 
 export default function AdminRequests() {
   const [requests, setRequests] = useState([]);
@@ -33,7 +34,10 @@ export default function AdminRequests() {
   const [selectedId, setSelectedId] = useState(null);
   const [reason, setReason] = useState("");
   const [searchInput, setSearchInput] = useState("");
-  const [depts, setDepts] = useState(["All"]);
+  // Instead of building depts dynamically from current page:
+  const allDepartments = ["All", "CSE", "ECE", "ME", "CE"]; // or fetch from backend
+  const [depts, setDepts] = useState(allDepartments);
+
 
   // Debounce search input
   useEffect(() => {
@@ -45,73 +49,102 @@ export default function AdminRequests() {
   useEffect(() => setPage(1), [filters, rowsPerPage]);
 
   // Fetch requests from server
+  // Fetch requests from server
   const loadRequests = async () => {
     try {
-      const queryFilters = {};
+      const queryFilters = {
+        search: filters.search || undefined,
+        status: filters.status !== "All" ? filters.status : undefined,
+        dept: filters.dept !== "All" ? filters.dept : undefined,
+        leaveType: filters.leaveType || undefined,  // <-- ADD THIS LINE
+        from: filters.fromDate || undefined, // <-- backend expects "from"
+        to: filters.toDate || undefined,     // <-- backend expects "to"
+        appliedFrom: filters.appliedFrom || undefined,
+        appliedTo: filters.appliedTo || undefined,
+        page,
+        limit: rowsPerPage,
+        sortKey: sortConfig.key,
+        sortDir: sortConfig.direction,
+      };
 
-      // Only include filters if they are active
-      if (filters.status !== "All") queryFilters.status = filters.status;
-      if (filters.dept !== "All") queryFilters.dept = filters.dept;
-      if (filters.search) queryFilters.search = filters.search;
-      if (filters.fromDate) queryFilters.fromDate = filters.fromDate;
-      if (filters.toDate) queryFilters.toDate = filters.toDate;
-      if (filters.appliedFrom) queryFilters.appliedFrom = filters.appliedFrom;
-      if (filters.appliedTo) queryFilters.appliedTo = filters.appliedTo;
-
-      // Always include pagination & sorting
-      queryFilters.page = page;
-      queryFilters.limit = rowsPerPage;
-      queryFilters.sortKey = sortConfig.key;
-      queryFilters.sortDir = sortConfig.direction;
-
-      const json = await adminController.getLeaves(queryFilters);
-
-      console.log(json);
-      
-
+      const json = await adminController.getRequests(queryFilters);
       setRequests(json.data || []);
       setTotalPages(json.pagination?.totalPages || 1);
-      setDepts(["All", ...Array.from(new Set((json.data || []).map(r => r.dept)))]);
     } catch (err) {
       console.error("Failed to fetch requests", err);
     }
   };
 
-
-  useEffect(() => { loadRequests(); }, [filters, page, rowsPerPage, sortConfig]);
+  // Whenever filters, page, rowsPerPage, or sortConfig changes, reload
+  useEffect(() => {
+    loadRequests();
+  }, [filters, page, rowsPerPage, sortConfig]);
 
   // Approve / Reject / Cancel actions
+  // Handle Approve / Reject actions
   const handleAction = async (actionType, ids) => {
+    if (!ids || !ids.length) return;
     try {
-      await Promise.all(ids.map(id =>
-        fetch(`/api/admin/leaves/${id}`, {
-          method: "PATCH",
-          body: JSON.stringify({ status: actionType, actionReason: reason }),
-          headers: { "Content-Type": "application/json" },
-        })
-      ));
-      setModalOpen(false); setSelectedIds([]); setSelectedId(null); setReason("");
+      // Only approve/reject for now
+      if (actionType === "Approved") {
+        await adminController.handleAction("approve", ids);
+      } else if (actionType === "Rejected") {
+        await adminController.handleAction("reject", ids);
+      }
+
+      setModalOpen(false);
+      setSelectedIds([]);
+      setSelectedId(null);
+      setReason("");
+
       loadRequests();
     } catch (err) {
-      console.error(err);
+      console.error(`${actionType} action failed`, err);
+      alert(`Failed to ${actionType.toLowerCase()} leave(s).`);
     }
   };
 
+  // Confirm action from modal
   const confirmAction = () => {
     const idsToUpdate = selectedIds.length ? selectedIds : [selectedId];
-    handleAction(modalAction, idsToUpdate);
+    handleAction(modalAction, idsToUpdate); // modify backend later to accept reason
   };
 
   // Reset selection when status filter changes
   useEffect(() => { setSelectedIds([]); }, [filters.status]);
 
+  const columnMap = {
+    ID: "id",
+    name: "name",
+    "dept.": "dept",
+    from: "fromDate",
+    to: "toDate",
+    applied: "appliedOn",
+    LeaveType: "leaveType",
+    status: "status",
+  };
+
   const requestSort = (key) => {
-    setSortConfig(prev => ({ key, direction: prev.key === key && prev.direction === "asc" ? "desc" : "asc" }));
+    const columnMap = {
+      ID: "id",
+      name: "name",
+      "dept.": "dept",
+      from: "fromDate",
+      to: "toDate",
+      applied: "appliedOn",
+      LeaveType: "leaveType",
+      status: "status",
+    };
+    const backendKey = columnMap[key] || key;
+    setSortConfig(prev => ({
+      key: backendKey,
+      direction: prev.key === backendKey && prev.direction === "asc" ? "desc" : "asc",
+    }));
   };
 
   // Export CSV using currently displayed requests
   const exportCSV = () => {
-    const rows = [["ID", "Name", "Dept.", "From", "To", "Applied", "Reason", "Status"], ...requests.map(r => [r.id, r.name, r.dept, r.from, r.to, r.applied, r.reason, r.status])];
+    const rows = [["ID", "Name", "Dept.", "From", "To", "Applied", "LeaveType", "Status"], ...requests.map(r => [r.id, r.name, r.dept, r.from, r.to, r.applied, r.reason, r.status])];
     const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
@@ -122,48 +155,6 @@ export default function AdminRequests() {
     setFilters({ search: "", status: "All", dept: "All", fromDate: "", toDate: "", appliedFrom: "", appliedTo: "" });
     setSearchInput("");
   };
-
-  // Filtered and sorted requests (used for checkboxes & pagination)
-  const filtered = useMemo(() => {
-    let data = [...requests];
-
-    // Filter by status
-    if (filters.status !== "All") data = data.filter(r => r.status === filters.status);
-
-    // Filter by dept
-    if (filters.dept !== "All") data = data.filter(r => r.dept === filters.dept);
-
-    // Filter by search
-    if (filters.search) {
-      const s = filters.search.toLowerCase();
-      data = data.filter(
-        r =>
-          r.name.toLowerCase().includes(s) ||
-          r.reason.toLowerCase().includes(s) ||
-          r.dept.toLowerCase().includes(s) ||
-          r.status.toLowerCase().includes(s)
-      );
-    }
-
-    // Sorting
-    if (sortConfig.key) {
-      data.sort((a, b) => {
-        const aVal = a[sortConfig.key] ?? "";
-        const bVal = b[sortConfig.key] ?? "";
-        if (aVal < bVal) return sortConfig.direction === "asc" ? -1 : 1;
-        if (aVal > bVal) return sortConfig.direction === "asc" ? 1 : -1;
-        return 0;
-      });
-    }
-
-    return data;
-  }, [requests, filters, sortConfig]);
-
-  // Paginated requests
-  const paginated = useMemo(() => {
-    const start = (page - 1) * rowsPerPage;
-    return filtered.slice(start, start + rowsPerPage);
-  }, [filtered, page, rowsPerPage]);
 
   const statusColors = {
     Pending: "bg-yellow-100 text-yellow-800 border border-yellow-300",
@@ -257,7 +248,8 @@ export default function AdminRequests() {
 
         {/* Filters */}
         <div className="bg-white p-4 rounded-2xl shadow mb-6">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
+            {/* Search */}
             <div className="relative md:col-span-2">
               <FiSearch className="absolute left-3 top-3 text-gray-400" />
               <input
@@ -270,8 +262,8 @@ export default function AdminRequests() {
               />
             </div>
 
-            <div className="flex items-center gap-2">
-              <FiFilter className="text-gray-500" />
+            {/* Status */}
+            <div>
               <select
                 value={filters.status}
                 onChange={(e) => setFilters((f) => ({ ...f, status: e.target.value }))}
@@ -284,6 +276,7 @@ export default function AdminRequests() {
               </select>
             </div>
 
+            {/* Department */}
             <div>
               <select
                 value={filters.dept}
@@ -293,6 +286,27 @@ export default function AdminRequests() {
                 {depts.map((d) => (
                   <option key={d} value={d}>
                     {d}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Leave Type */}
+            <div>
+              <select
+                value={filters.leaveType || "All"}
+                onChange={(e) =>
+                  setFilters((f) => ({
+                    ...f,
+                    leaveType: e.target.value === "All" ? undefined : e.target.value,
+                  }))
+                }
+                className="w-full px-3 py-2 border rounded-lg shadow-sm"
+              >
+                <option value="All">All Leave Types</option>
+                {Object.entries(leaveController.leaveTypes).map(([key, val]) => (
+                  <option key={key} value={key}>
+                    {val.acronym} ({key})
                   </option>
                 ))}
               </select>
@@ -338,7 +352,6 @@ export default function AdminRequests() {
                 className="w-full px-3 py-2 border rounded-lg shadow-sm"
               />
             </div>
-
           </div>
 
           <div className="flex items-center gap-2 mt-4">
@@ -366,42 +379,61 @@ export default function AdminRequests() {
           </div>
         </div>
 
+
+        {/* Table */}
         {/* Table */}
         <div className="bg-white rounded-2xl shadow-md overflow-hidden">
-          {paginated.length > 0 ? (
+          {requests.length > 0 ? (
             <div className="overflow-x-auto">
-              <table className="min-w-full text-sm text-left">
+              <table className="table-auto text-sm text-left w-full">
                 <thead className="bg-gray-100 text-gray-700">
                   <tr>
                     <th className="px-6 py-3">
                       <input
                         type="checkbox"
                         disabled={filters.status === "All"}
-                        checked={selectedIds.length === filtered.length && filtered.length > 0}
+                        checked={selectedIds.length === requests.length && requests.length > 0}
                         onChange={(e) =>
-                          setSelectedIds(e.target.checked ? filtered.map((r) => r.id) : [])
+                          setSelectedIds(e.target.checked ? requests.map((r) => r.id) : [])
                         }
                       />
                     </th>
-                    {["name", "dept.", "from", "to", "applied", "reason", "status"].map((key, i) => (
+
+                    {["ID", "name", "dept.", "from", "to", "applied", "LeaveType", "status"].map((key, i) => (
                       <th
                         key={i}
-                        onClick={() => requestSort(key)}
+                        onClick={() => {
+                          const columnMap = {
+                            ID: "id",
+                            name: "name",
+                            "dept.": "dept",
+                            from: "fromDate",
+                            to: "toDate",
+                            applied: "appliedOn",
+                            LeaveType: "leaveType",
+                            status: "status",
+                          };
+                          const backendKey = columnMap[key] || key;
+                          setSortConfig((prev) => ({
+                            key: backendKey,
+                            direction: prev.key === backendKey && prev.direction === "asc" ? "desc" : "asc",
+                          }));
+                        }}
                         className="px-4 py-4 font-semibold cursor-pointer select-none"
                       >
                         {key.charAt(0).toUpperCase() + key.slice(1)}
-                        {sortConfig.key === key && (sortConfig.direction === "asc" ? <FiChevronUp className="inline ml-1" /> : <FiChevronDown className="inline ml-1" />)}
+                        {sortConfig.key === (key === "from" ? "fromDate" : key === "to" ? "toDate" : key === "applied" ? "appliedOn" : key) &&
+                          (sortConfig.direction === "asc" ? <FiChevronUp className="inline ml-1" /> : <FiChevronDown className="inline ml-1" />)}
                       </th>
                     ))}
                     <th className="px-6 py-4">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {paginated.map((req) => (
+                  {requests.map((req) => (
                     <tr
                       key={req.id}
-                      className={`border-b last:border-none hover:bg-gray-50 ${selectedIds.includes(req.id) ? "bg-blue-50" : ""
-                        }`}
+                      className={`border-b last:border-none hover:bg-gray-50 ${selectedIds.includes(req.id) ? "bg-blue-50" : ""}`}
                     >
                       <td className="px-6 py-3">
                         <input
@@ -416,49 +448,69 @@ export default function AdminRequests() {
                         />
                       </td>
 
-                      <td className="px-4 py-4 flex items-center">{req.name}</td>
-                      <td className="px-4 py-4">{req.dept}</td>
-                      <td className="px-4 py-4">{req.from}</td>
-                      <td className="px-4 py-4">{req.to}</td>
-                      <td className="px-4 py-4">{req.applied}</td>
-                      <td className="px-4 py-4">{req.reason}</td>
+                      <td className="px-4 py-4 whitespace-nowrap">{req.user_id}</td>
+                      <td className="px-4 py-4 whitespace-nowrap">{req.name}</td>
+                      <td className="px-4 py-4 whitespace-nowrap">{req.dept}</td>
+                      <td className="px-4 py-4 whitespace-nowrap">{req.fromDate}</td>
+                      <td className="px-4 py-4 whitespace-nowrap">{req.toDate}</td>
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        {req.appliedOn
+                          ? new Date(req.appliedOn).toLocaleString("en-IN", {
+                            day: "2-digit",
+                            month: "short",
+                            year: "numeric",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                            hour12: true,
+                          }).replace(",", "")
+                          : ""}
+                      </td>
+
+                      <td className="px-4 py-4">
+                        {leaveController.leaveTypes[req.leaveType]?.acronym || req.leaveType}
+                      </td>
+
                       <td className="px-4 py-4">
                         <span className={`px-3 py-1 rounded-full text-xs font-medium ${statusColors[req.status]}`}>
                           {req.status}
                         </span>
                       </td>
-                      <td className="px-3 py-4 flex gap-3">
+
+                      <td className="px-3 py-4 flex gap-2">
                         {req.status === "Pending" && (
                           <>
                             <button
+                              title="Approve"
                               onClick={() => {
                                 setSelectedId(req.id);
                                 setModalAction("Approved");
                                 setModalOpen(true);
                               }}
-                              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white text-sm shadow-sm"
+                              className="p-2 rounded-lg bg-green-600 hover:bg-green-700 text-white shadow-sm"
                             >
-                              <FiCheckCircle size={18} /> Approve
+                              <FiCheckCircle size={16} />
                             </button>
                             <button
+                              title="Reject"
                               onClick={() => {
                                 setSelectedId(req.id);
                                 setModalAction("Rejected");
                                 setModalOpen(true);
                               }}
-                              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm shadow-sm"
+                              className="p-2 rounded-lg bg-red-600 hover:bg-red-700 text-white shadow-sm"
                             >
-                              <FiXCircle size={18} /> Reject
+                              <FiXCircle size={16} />
                             </button>
                             <button
+                              title="Cancel"
                               onClick={() => {
                                 setSelectedId(req.id);
                                 setModalAction("Cancelled");
                                 setModalOpen(true);
                               }}
-                              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gray-600 hover:bg-gray-700 text-white text-sm shadow-sm"
+                              className="p-2 rounded-lg bg-gray-600 hover:bg-gray-700 text-white shadow-sm"
                             >
-                              Cancel
+                              <FiUser size={16} />
                             </button>
                           </>
                         )}
@@ -466,44 +518,44 @@ export default function AdminRequests() {
                         {req.status === "Approved" && (
                           <>
                             <button
+                              title="Reject"
                               onClick={() => {
                                 setSelectedId(req.id);
                                 setModalAction("Rejected");
                                 setModalOpen(true);
                               }}
-                              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm shadow-sm"
+                              className="p-2 rounded-lg bg-red-600 hover:bg-red-700 text-white shadow-sm"
                             >
-                              <FiXCircle size={18} /> Reject
+                              <FiXCircle size={16} />
                             </button>
                             <button
+                              title="Cancel"
                               onClick={() => {
                                 setSelectedId(req.id);
                                 setModalAction("Cancelled");
                                 setModalOpen(true);
                               }}
-                              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gray-600 hover:bg-gray-700 text-white text-sm shadow-sm"
+                              className="p-2 rounded-lg bg-gray-600 hover:bg-gray-700 text-white shadow-sm"
                             >
-                              Cancel
+                              <FiUser size={16} />
                             </button>
                           </>
                         )}
 
                         {req.status === "Rejected" && (
                           <button
+                            title="Approve"
                             onClick={() => {
                               setSelectedId(req.id);
                               setModalAction("Approved");
                               setModalOpen(true);
                             }}
-                            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white text-sm shadow-sm"
+                            className="p-2 rounded-lg bg-green-600 hover:bg-green-700 text-white shadow-sm"
                           >
-                            <FiCheckCircle size={18} /> Approve
+                            <FiCheckCircle size={16} />
                           </button>
                         )}
-                        {/* Cancelled → No actions */}
                       </td>
-
-
                     </tr>
                   ))}
                 </tbody>
@@ -519,31 +571,27 @@ export default function AdminRequests() {
           <span className="text-sm text-gray-600">
             Page {page} of {totalPages}
           </span>
-          <div className="flex gap-2">
+          <div className="flex gap-2 items-center">
             <button disabled={page === 1} onClick={() => setPage(1)} className="px-3 py-1 border rounded disabled:opacity-50">
               First
             </button>
             <button disabled={page === 1} onClick={() => setPage((p) => Math.max(1, p - 1))} className="px-3 py-1 border rounded disabled:opacity-50">
               Previous
             </button>
-
-            <div className="flex items-center gap-2">
-              <input
-                type="number"
-                min={1}
-                max={totalPages}
-                value={page}
-                onChange={(e) => setPage(Math.min(Math.max(1, Number(e.target.value || 1)), totalPages))}
-                className="w-16 px-2 py-1 border rounded text-center"
-                aria-label="Page number"
-              />
-              <button disabled={page === totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))} className="px-3 py-1 border rounded disabled:opacity-50">
-                Next
-              </button>
-              <button disabled={page === totalPages} onClick={() => setPage(totalPages)} className="px-3 py-1 border rounded disabled:opacity-50">
-                Last
-              </button>
-            </div>
+            <input
+              type="number"
+              min={1}
+              max={totalPages}
+              value={page}
+              onChange={(e) => setPage(Math.min(Math.max(1, Number(e.target.value || 1)), totalPages))}
+              className="w-16 px-2 py-1 border rounded text-center"
+            />
+            <button disabled={page === totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))} className="px-3 py-1 border rounded disabled:opacity-50">
+              Next
+            </button>
+            <button disabled={page === totalPages} onClick={() => setPage(totalPages)} className="px-3 py-1 border rounded disabled:opacity-50">
+              Last
+            </button>
           </div>
         </div>
       </div>

@@ -1,5 +1,6 @@
 import { DataTypes, Model } from "sequelize";
 import { sequelize } from "../config.js"; // your sequelize instance
+import User from "./User.js";
 
 class LeavePending extends Model {
   // Static method to check field uniqueness
@@ -54,5 +55,6 @@ LeavePending.init(
     },
   }
 );
+
 
 export default LeavePending;

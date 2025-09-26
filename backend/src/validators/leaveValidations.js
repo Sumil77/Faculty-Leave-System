@@ -1,5 +1,5 @@
 import Joi from "joi";
-import LeaveBalance from "../models/leaveBalance.js";
+import { LeaveBalance } from "../models/index.js";
 
 export const leaveTypes = {
   casual: { fullName: "Casual", acronym: "CL" },
@@ -52,10 +52,11 @@ export const leaveSchema = Joi.object({
     .required()
     .label("Type of Leave")
     .messages({
-      "any.only": `"Type of Leave" must be one of: ${validLeaveTypes.join(", ")}`,
+      "any.only": `"Type of Leave" must be one of: ${validLeaveTypes.join(
+        ", "
+      )}`,
     }),
 });
-
 
 export const validateLeaveBalance = async (
   userId,

@@ -608,47 +608,66 @@ export const handlers = [
     const sortDir = url.searchParams.get("sortDir") || "asc";
     const summary = url.searchParams.get("summary");
 
-    if (summary) {
-      // All leaves combined
-      const allLeaves = [...mockPending, ...mockApproved, ...mockRejected];
+    // 🔹 Normalize + enrich leaves
+    const normalizeLeaves = (leaves) =>
+      leaves.map((l) => {
+        const user = mockUsers.find((u) => u.user_id === l.user_id);
+        return {
+          leave_id: l.id,
+          user_id: l.user_id,
+          from: l.from,
+          to: l.to,
+          appliedOn: l.appliedOn, // keep ISO string
+          reason: l.reason,
+          type: l.leaveType,
+          status: l.status,
+          user: user
+            ? {
+                name: user.name,
+                email: user.email,
+                dept: user.dept,
+                desig: user.desig,
+                phno: user.phno,
+              }
+            : null,
+        };
+      });
 
+    const allLeaves = normalizeLeaves([
+      ...mockPending,
+      ...mockApproved,
+      ...mockRejected,
+    ]);
+
+    if (summary) {
       // Stats
       const totalLeaves = allLeaves.length;
-      const pending = mockPending.length;
-      const approved = mockApproved.length;
-      const rejected = mockRejected.length;
+      const pending = allLeaves.filter((l) => l.status === "Pending").length;
+      const approved = allLeaves.filter((l) => l.status === "Approved").length;
+      const rejected = allLeaves.filter((l) => l.status === "Rejected").length;
       const approvedPercent = totalLeaves
         ? Math.round((approved / totalLeaves) * 100)
         : 0;
 
       // Group by department
-      const deptReports = mockUsers.map((u) => {
-        const deptLeaves = allLeaves.filter((l) => l.user_id === u.user_id);
-        return {
-          name: u.dept,
-          leaves: deptLeaves.length,
-          approved: deptLeaves.filter((l) => l.status === "Approved").length,
-          rejected: deptLeaves.filter((l) => l.status === "Rejected").length,
-          pending: deptLeaves.filter((l) => l.status === "Pending").length,
-        };
-      });
+      const deptReports = allLeaves.reduce((acc, l) => {
+        if (!l.user?.dept) return acc;
+        if (!acc[l.user.dept]) {
+          acc[l.user.dept] = {
+            name: l.user.dept,
+            leaves: 0,
+            approved: 0,
+            rejected: 0,
+            pending: 0,
+          };
+        }
+        acc[l.user.dept].leaves += 1;
+        acc[l.user.dept][l.status.toLowerCase()] += 1;
+        return acc;
+      }, {});
 
-      // Merge same department entries
-      const deptSummary = Object.values(
-        deptReports.reduce((acc, curr) => {
-          if (!acc[curr.name]) {
-            acc[curr.name] = { ...curr };
-          } else {
-            acc[curr.name].leaves += curr.leaves;
-            acc[curr.name].approved += curr.approved;
-            acc[curr.name].rejected += curr.rejected;
-            acc[curr.name].pending += curr.pending;
-          }
-          return acc;
-        }, {})
-      );
-
-      // Find top dept by leaves
+      // Find top dept
+      const deptSummary = Object.values(deptReports);
       const topDept =
         deptSummary.sort((a, b) => b.leaves - a.leaves)[0]?.name || "N/A";
 
@@ -658,14 +677,17 @@ export const handlers = [
       });
     }
 
+    // 🔹 Filter by status
     let data = [];
-    if (status === "Pending") data = [...mockPending];
-    else if (status === "Approved") data = [...mockApproved];
-    else if (status === "Rejected") data = [...mockRejected];
-    else if (status === "All")
-      data = [...mockPending, ...mockApproved, ...mockRejected];
+    if (status === "Pending")
+      data = allLeaves.filter((l) => l.status === "Pending");
+    else if (status === "Approved")
+      data = allLeaves.filter((l) => l.status === "Approved");
+    else if (status === "Rejected")
+      data = allLeaves.filter((l) => l.status === "Rejected");
+    else if (status === "All") data = allLeaves;
 
-    // Sorting
+    // 🔹 Sorting
     if (sortKey) {
       data.sort((a, b) => {
         const valA = a[sortKey];
@@ -676,10 +698,22 @@ export const handlers = [
       });
     }
 
+    // 🔹 Pagination
     const totalEntries = data.length;
     const totalPages = Math.max(Math.ceil(totalEntries / limit), 1);
     const offset = (page - 1) * limit;
     const paginated = data.slice(offset, offset + limit);
+
+    console.log({
+      data: paginated,
+      pagination: {
+        currentPage: page,
+        totalPages,
+        totalEntries,
+        hasNextPage: page < totalPages,
+        hasPrevPage: page > 1,
+      },
+    });
 
     return HttpResponse.json({
       data: paginated,

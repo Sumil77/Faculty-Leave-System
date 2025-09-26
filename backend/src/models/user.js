@@ -1,5 +1,11 @@
 import { DataTypes, Model } from "sequelize";
 import { sequelize } from "../config.js"; // your sequelize instance
+import LeaveApproved from "./leaveApproved.js";
+import LeaveRejected from "./leaveRejected.js";
+import LeavePending from "./leavePending.js";
+import LeaveBalance from "./leaveBalance.js";
+import LeaveTaken from "./leaveTaken.js";
+import CompensatoryLeave from "./CompensatoryLeave.js";
 
 class User extends Model {
   // Static method to check field uniqueness
@@ -14,61 +20,31 @@ User.init(
     user_id: {
       type: DataTypes.BIGINT,
       allowNull: false,
-      primaryKey : true,
-      unique: {
-        msg: "User_Id already exists",
-      },
-      validate: {
-        async isUnique(value) {
-          const exists = await User.count({ where: { username: value } });
-          if (exists) {
-            throw new Error("User_Id already exists");
-          }
-        },
-      },
+      primaryKey: true,
+      unique: true,
     },
     email: {
       type: DataTypes.STRING,
       allowNull: false,
-      unique: {
-        msg: "Email already exists",
-      },
+      unique: true, // DB-level unique
       validate: {
         isEmail: { msg: "Must be a valid email" },
-        async isUnique(value) {
-          const exists = await User.count({ where: { email: value } });
-          if (exists) {
-            throw new Error("Email already exists");
-          }
-        },
       },
     },
-    name: {
-      type: DataTypes.STRING,
-      allowNull: false,
-    },
-    desig: {
-      type: DataTypes.STRING,
-      allowNull: false,
-    },
-    dept: {
-      type: DataTypes.STRING,
-      allowNull: false,
-    },
-    phno: {
-      type: DataTypes.BIGINT,
-      allowNull: false,
-    },
-    dateOfJoining: {
-      type: DataTypes.DATEONLY,
-      allowNull: false,
-    },
+    name: { type: DataTypes.STRING, allowNull: false },
+    desig: { type: DataTypes.STRING, allowNull: false },
+    dept: { type: DataTypes.STRING, allowNull: false },
+    phno: { type: DataTypes.STRING, allowNull: false },
+    dateOfJoining: { type: DataTypes.DATEONLY, allowNull: false },
   },
   {
     sequelize,
     modelName: "User",
     timestamps: true,
+    paranoid: true, // enable soft deletes
+    deletedAt: "deletedAt",
   }
 );
+
 
 export default User;

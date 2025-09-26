@@ -1,5 +1,4 @@
-import Credentials from "../models/credentials.js";
-import User from "../models/user.js";
+import { Credentials, User } from "../models/index.js";
 
 export const parseError = (err) => {
   if (err.isJoi) {

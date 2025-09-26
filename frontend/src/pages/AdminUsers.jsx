@@ -47,28 +47,45 @@ export default function AdminUsers() {
   };
 
   // Fetch users from API
-  const loadUsers = async () => {
+  // Fetch users from API
+  // Fetch users from API
+  const loadUsers = async ({
+    searchTerm,
+    deptFilter,
+    roleFilter,
+    customPage
+  } = {}) => {
     try {
       const filters = {
-        searchTerm: search,
-        deptFilter: filterDept === "All" ? "" : filterDept,
-        roleFilter: filterRole === "All" ? "" : filterRole,
-        page,
+        searchTerm: searchTerm !== undefined ? searchTerm.trim() : search.trim(),
+        deptFilter: deptFilter !== undefined
+          ? deptFilter === "All" ? "" : deptFilter
+          : filterDept === "All" ? "" : filterDept,
+        roleFilter: roleFilter !== undefined
+          ? roleFilter === "All" ? "" : roleFilter
+          : filterRole === "All" ? "" : filterRole,
+        page: customPage || page,
         limit: perPage,
       };
+
       const { data = [], pagination = {} } = await adminController.getUsers(filters);
       setUsers(data);
       setTotalPages(pagination.totalPages || 1);
-
+      setPage(filters.page);
     } catch (err) {
       console.error(err);
       showToast("Failed to fetch users", "error");
     }
   };
 
+
+  // Trigger loadUsers whenever page changes
   useEffect(() => {
-    loadUsers();
-  }, [search, filterDept, filterRole, page]);
+    loadUsers({ customPage: page }); // only runs on page change
+  }, [page]);
+
+
+
 
   // Add User
   const handleAddUser = async (newUser) => {
@@ -111,7 +128,7 @@ export default function AdminUsers() {
   const handleBulkDelete = async () => {
     try {
       console.log(selectedIds);
-      
+
       await adminController.deleteUsers(selectedIds.map(Number));
       setSelectedIds([]);
       showToast("Selected users deleted", "error");
@@ -132,13 +149,25 @@ export default function AdminUsers() {
 
   // Sorting toggle
   const toggleSort = (field) => {
-    if (sortField === field) {
+    const backendFieldMap = {
+      facultyId: "user_id",
+      name: "name",
+      department: "dept",
+      role: "desig",
+    };
+    const backendField = backendFieldMap[field] || field;
+
+    if (sortField === backendField) {
       setSortOrder(sortOrder === "asc" ? "desc" : "asc");
     } else {
-      setSortField(field);
+      setSortField(backendField);
       setSortOrder("asc");
     }
+
+    // reload page with new sort (optional)
+    loadUsers(1);
   };
+
 
   // Apply local sorting & filtering (for current page only)
   const pageData = useMemo(() => {
@@ -171,7 +200,7 @@ export default function AdminUsers() {
       </div>
 
       {/* Search + Filters */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <div className="flex items-center border rounded-xl px-3 py-2 bg-white shadow-sm">
           <FiSearch className="text-gray-400 mr-2" />
           <input
@@ -203,7 +232,24 @@ export default function AdminUsers() {
           <option value="Faculty">Faculty</option>
           <option value="Staff">Staff</option>
         </select>
+
+        {/* Search Button */}
+        <button
+          className="bg-blue-600 text-white px-5 py-2 rounded-xl hover:bg-blue-700 shadow-md"
+          onClick={() => loadUsers({
+            searchTerm: search,
+            deptFilter: filterDept,
+            roleFilter: filterRole,
+            customPage: 1
+          })}
+
+        >
+          Search
+        </button>
+
+
       </div>
+
 
       {/* Bulk Actions */}
       {selectedIds.length > 0 && (
@@ -278,17 +324,18 @@ export default function AdminUsers() {
                 Name {sortField === "name" && (sortOrder === "asc" ? "↑" : "↓")}
               </th>
               <th
-                className="w-[160px] px-2 py-3 text-left text-gray-700 font-semibold cursor-pointer select-none"
+                className="w-[160px] px-2 py-3 text-left font-semibold cursor-pointer"
                 onClick={() => toggleSort("department")}
               >
-                Department {sortField === "department" && (sortOrder === "asc" ? "↑" : "↓")}
+                Department {sortField === "dept" && (sortOrder === "asc" ? "↑" : "↓")}
               </th>
               <th
-                className="w-[120px] px-2 py-3 text-left text-gray-700 font-semibold cursor-pointer select-none"
+                className="w-[120px] px-2 py-3 text-left font-semibold cursor-pointer"
                 onClick={() => toggleSort("role")}
               >
-                Role {sortField === "role" && (sortOrder === "asc" ? "↑" : "↓")}
+                Role {sortField === "desig" && (sortOrder === "asc" ? "↑" : "↓")}
               </th>
+
               <th className="w-[120px] px-2 py-3 text-left text-gray-700 font-semibold">
                 Actions
               </th>
