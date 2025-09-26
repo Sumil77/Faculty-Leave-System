@@ -1,12 +1,16 @@
 // src/pages/ReportGenerator.jsx (replace file contents with this)
 import { useState, useEffect, useCallback } from "react";
-import { FiDownload, FiMail, FiSearch, FiArrowLeft, FiBarChart2 } from "react-icons/fi";
+import { FiDownload, FiMail, FiSearch, FiArrowLeft, FiBarChart2, FiChevronDown } from "react-icons/fi";
 import { useNavigate } from "react-router-dom";
 import { leaveTypes } from "../util/leave.js";
-import { getUsers, getLeaves, downloadReport, mailReport } from "../util/admin.js";
+import { getLeaveHistory, mailReport, getLeaveSummary, mailHistoryReport, requestDownload, waitForJobReady, formatMap, fetchDownloadFile } from "../util/admin.js";
+import SummaryTable from "../components/SummaryTable.jsx";
+import HistoryTable from "../components/HistoryTable.jsx";
 
 export default function ReportGenerator() {
   const navigate = useNavigate();
+
+  const [reportType, setReportType] = useState("summary");
 
   // Filters
   const [searchTerm, setSearchTerm] = useState("");
@@ -15,6 +19,9 @@ export default function ReportGenerator() {
   const [typeFilter, setTypeFilter] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  const [showDownloadMenu, setShowDownloadMenu] = useState(false);
+  const [showMailModal, setShowMailModal] = useState(false);
+  const [email, setEmail] = useState(""); // pass default email if you have it
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
@@ -26,8 +33,17 @@ export default function ReportGenerator() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  // Local cache for users (to enrich leaves)
-  const [usersMap, setUsersMap] = useState({});
+  const formatDate = (dateString) => {
+    const date = new Date(dateString);
+    return date.toLocaleString("en-GB", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
 
   const safeParseDate = (s) => {
     if (!s) return null;
@@ -36,236 +52,200 @@ export default function ReportGenerator() {
     return isNaN(d.getTime()) ? null : d;
   };
 
-  const enrichLeavesWithUsers = (rawLeaves, users) => {
-    const map = users.reduce((acc, u) => {
-      const id = u.user_id ?? u.id ?? u.userId ?? u.uid;
-      if (id != null) acc[id] = u;
-      return acc;
-    }, {});
-    // keep usersMap for reuse
-    setUsersMap(map);
-
-    return rawLeaves.map((l) => {
-      const user = map[l.user_id];
-      const faculty = user?.name || user?.fullName || user?.faculty || `User ${l.user_id || ""}`;
-      const dept = user?.dept || l.dept || "";
-      const typeKey = l.leaveType || l.type || "";
-      const appliedOnIso = l.appliedOn ?? l.applied_on ?? null;
-      const appliedOnDisplay = l.appliedOnIST ?? appliedOnIso ?? l.appliedOnDisplay ?? "";
-      return {
-        id: l.id,
-        user_id: l.user_id,
-        faculty,
-        dept,
-        type: typeKey,
-        status: l.status,
-        appliedOnISO: appliedOnIso,
-        appliedOn: appliedOnDisplay,
-        fromDate: l.fromDate ?? l.from,
-        toDate: l.toDate ?? l.to,
-        raw: l,
-      };
-    });
-  };
-
+  // Within loadLeaves() useCallback
   const loadLeaves = useCallback(async () => {
     setLoading(true);
     setError("");
-    try {
 
-      // prepare server query that the handler supports
-      const serverQuery = {
-        status: statusFilter || "All", // handler expects 'status'
-        sortKey: "fromDate", // sensible default (handler sorts by this if available)
-        sortDir: "asc",
+    try {
+      const filters = {
+        dept: deptFilter || undefined,
+        status: statusFilter || undefined,
+        leave_type: typeFilter || undefined,  // ✅ was leaveType
+        from: startDate || undefined,
+        to: endDate || undefined,
+        page: currentPage,
+        limit: entriesPerPage,
       };
 
-      // If client-side filters are active, fetch a large page (so we can filter locally).
-      // In prod you should request a proper endpoint (or backend should support these filters).
-      const fetchAll =
-        Boolean(searchTerm?.trim() || deptFilter || typeFilter || startDate || endDate);
-      if (fetchAll) {
-        serverQuery.page = 1;
-        serverQuery.limit = 1000; // reasonably large for dev/mock data
-      } else {
-        serverQuery.page = currentPage;
-        serverQuery.limit = entriesPerPage;
-      }
 
-      // call server (handler)
-      const result = await getLeaves({
-        status: statusFilter || "All",
-        sortKey: "fromDate",
-        sortDir: "asc",
-        page: fetchAll ? 1 : currentPage,
-        limit: fetchAll ? 1000 : entriesPerPage,
-      });
+      const result =
+        reportType === "summary"
+          ? await getLeaveSummary(filters)
+          : await getLeaveHistory(filters);
 
-      const serverLeaves = result?.data || [];
-      const pagination = result?.pagination || { totalPages: 1 };
-
-      // fetch users (small set). We try to reuse cached users if present and contains all user_ids;
-      // otherwise request users (simple approach: fetch many)
-      const userIdsNeeded = Array.from(new Set(serverLeaves.map((l) => l.user_id).filter(Boolean)));
-      let usersList = [];
-      const cachedHasAll = userIdsNeeded.every((id) => usersMap[id]);
-      if (cachedHasAll && Object.keys(usersMap).length > 0) {
-        usersList = userIdsNeeded.map((id) => usersMap[id]).filter(Boolean);
-      } else {
-        // fetch many users; mock handler supports page + limit
-        try {
-          const usersRes = await getUsers({ page: 1, limit: 1000 });
-          usersList = usersRes?.data || usersRes || [];
-        } catch (uErr) {
-          // don't fail whole flow; continue with empty users
-          console.warn("Failed to fetch users for enrichment", uErr);
-          usersList = [];
-        }
-      }
-
-      // enrich rows
-      const enriched = enrichLeavesWithUsers(serverLeaves, usersList);
-
-      if (fetchAll) {
-        // apply client-side filters and then paginate locally
-        let filtered = enriched;
-
-        // global search (faculty name and dept)
-        const s = (searchTerm || "").trim().toLowerCase();
-        if (s) {
-          filtered = filtered.filter(
-            (r) =>
-              (r.faculty && r.faculty.toLowerCase().includes(s)) ||
-              (r.dept && r.dept.toLowerCase().includes(s)) ||
-              (r.type && r.type.toLowerCase().includes(s))
-          );
-        }
-
-        if (deptFilter) {
-          filtered = filtered.filter((r) => r.dept === deptFilter);
-        }
-
-        if (typeFilter) {
-          filtered = filtered.filter((r) => r.type === typeFilter);
-        }
-
-        if (startDate) {
-          const sdt = safeParseDate(startDate + "T00:00:00");
-          if (sdt) {
-            filtered = filtered.filter((r) => {
-              const a = safeParseDate(r.appliedOnISO || r.fromDate);
-              return a && a >= sdt;
-            });
-          }
-        }
-
-        if (endDate) {
-          const edt = safeParseDate(endDate + "T23:59:59");
-          if (edt) {
-            filtered = filtered.filter((r) => {
-              const a = safeParseDate(r.appliedOnISO || r.toDate);
-              return a && a <= edt;
-            });
-          }
-        }
-
-        const localTotalPages = Math.max(1, Math.ceil(filtered.length / entriesPerPage));
-        // ensure current page is in range
-        const pageToUse = Math.min(Math.max(1, currentPage), localTotalPages);
-        const startIndex = (pageToUse - 1) * entriesPerPage;
-        const pageSlice = filtered.slice(startIndex, startIndex + entriesPerPage);
-
-        setLeaves(pageSlice);
-        setTotalPages(localTotalPages);
-        if (pageToUse !== currentPage) setCurrentPage(pageToUse);
-      } else {
-        // server-side pagination used
-        setLeaves(enriched);
-        setTotalPages(pagination.totalPages ?? 1);
-      }
+      // Backend now returns { data: [...], total: number }
+      setLeaves(result.data || []);
+      const totalPagesCalc = Math.max(1, Math.ceil((result.total || 0) / entriesPerPage));
+      setTotalPages(totalPagesCalc);
     } catch (err) {
       console.error("Failed to fetch report data:", err);
-      setError(err?.message || "Something went wrong while fetching data!");
+      setError(err?.message || "Something went wrong!");
     } finally {
       setLoading(false);
     }
   }, [
     currentPage,
     entriesPerPage,
-    statusFilter,
-    searchTerm,
+    reportType,
     deptFilter,
     typeFilter,
     startDate,
     endDate,
-    usersMap,
+    statusFilter
   ]);
+
+
 
   useEffect(() => {
     loadLeaves();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchTerm, deptFilter, statusFilter, typeFilter, currentPage, entriesPerPage, startDate, endDate]);
+  }, [
+    reportType,
+    deptFilter,
+    statusFilter,
+    typeFilter,
+    currentPage,
+    entriesPerPage,
+    startDate,
+    endDate
+  ]);
 
 
-  // Backend CSV Download
-  const handleDownload = async () => {
+  const handleDownload = async (filters, format, type) => {
     try {
-      // The mock may not send a blob; we attempt to call the API and if it returns blob-handling info, handle it.
-      // We'll simply call the endpoint and attempt to download if it's a blob.
-      const query = {
-        status: statusFilter || "All",
-        page: 1,
-        limit: 1000,
-      };
-      const resp = await downloadReport(query);
-      // apiRequest currently returns parsed JSON; if backend returns a file URL we handle it
-      if (resp instanceof Blob) {
-        const url = window.URL.createObjectURL(resp);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = "leave_report.csv";
-        a.click();
-        URL.revokeObjectURL(url);
-      } else if (resp && resp.url) {
-        // backend returned URL to download
-        window.open(resp.url, "_blank");
-      } else {
-        console.log("Download response (non-blob):", resp);
-        alert("Download initiated (check console/mock).");
-      }
+      // 1. Start the download job
+      const { jobId } = await requestDownload(filters, format, type);
+
+      // 2. Wait until the job is ready
+      console.log("Requested format:", format);
+
+      await waitForJobReady(jobId, format);
+
+      // 3. Fetch and trigger the file download
+      fetchDownloadFile(jobId, format);
     } catch (err) {
       console.error("Download failed:", err);
-      alert("Failed to download report!");
     }
   };
 
-  // Backend Mail Report
-  const handleMail = async () => {
+  const handleMail = async (toEmail) => {
+    if (!toEmail) return;
+
+    console.log("Send mail to:", toEmail);
+
+    const filters = {
+      // Include any filters you want for the report
+      dept: deptFilter || undefined,
+      status: statusFilter || undefined,
+      leaveType: typeFilter || undefined,
+      from: startDate || undefined,
+      to: endDate || undefined,
+      page: currentPage,
+      limit: entriesPerPage,
+    };
+
     try {
-      const res = await mailReport({
-        status: statusFilter || "All",
-        // note: handler doesn't accept other filters; mock just returns a success object
-      });
-      alert((res && res.message) || "Report mailed to admin!");
+      const result =
+        reportType === "summary"
+          ? await mailReport({ email: toEmail, filters })
+          : await mailHistoryReport({ email: toEmail, filters });
+
+      if (result.success) {
+        alert("Email sent successfully!");
+      } else {
+        alert("Failed to send email: " + result.message);
+      }
     } catch (err) {
-      console.error("Mail failed:", err);
-      alert("Failed to mail report!");
+      console.error("Error sending email:", err);
+      alert("Something went wrong while sending email");
     }
   };
+
 
   return (
     <div className="p-6 bg-gray-100 min-h-screen">
-      {/* Back Button */}
-      <button
-        onClick={() => navigate(-1)}
-        className="flex items-center gap-2 px-4 py-2 mb-6 bg-gray-700 text-white rounded hover:bg-gray-800 transition"
-      >
-        <FiArrowLeft /> Back
-      </button>
+      <div className="flex items-center justify-between mb-6">
+        {/* Left side: Back + Title + Report type */}
+        <div className="flex items-center gap-4">
+          <button
+            onClick={() => navigate(-1)}
+            className="flex items-center gap-1 text-gray-500 hover:text-gray-700 transition text-sm"
+          >
+            <FiArrowLeft className="text-lg" />
+          </button>
 
-      <h1 className="text-2xl font-bold mb-6 flex items-center gap-2">
-        <FiBarChart2 /> Generate Reports
-      </h1>
+          <h1 className="text-2xl font-bold flex items-center gap-2 text-gray-800">
+            <FiBarChart2 /> Generate Reports
+          </h1>
+
+          {/* Report type toggle beside title */}
+          <div className="flex gap-2 ml-2">
+            <button
+              onClick={() => setReportType("summary")}
+              className={`px-3 py-1 rounded text-sm ${reportType === "summary"
+                ? "bg-blue-600 text-white"
+                : "bg-gray-200 text-gray-700"
+                }`}
+            >
+              Summary
+            </button>
+            <button
+              onClick={() => setReportType("history")}
+              className={`px-3 py-1 rounded text-sm ${reportType === "history"
+                ? "bg-blue-600 text-white"
+                : "bg-gray-200 text-gray-700"
+                }`}
+            >
+              History
+            </button>
+          </div>
+        </div>
+
+        {/* Right side: Download + Mail */}
+        <div className="flex items-center gap-3">
+          {/* Download dropdown */}
+          <div className="relative">
+            <button
+              onClick={() => setShowDownloadMenu(!showDownloadMenu)}
+              className="flex items-center gap-2 px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700 transition text-sm"
+            >
+              <FiDownload /> Download <FiChevronDown className="text-xs" />
+            </button>
+
+            {showDownloadMenu && (
+              <div className="absolute right-0 mt-1 bg-white border rounded shadow-lg w-32 z-10">
+                {["Excel", "PDF", "CSV"].map((format) => (
+                  <button
+                    key={format}
+                    onClick={() => {
+                      const filters = {
+                        dept: deptFilter || undefined,
+                        status: statusFilter || undefined,
+                        leaveType: typeFilter || undefined,
+                        from: startDate || undefined,
+                        to: endDate || undefined,
+                      };
+                      handleDownload(filters, format.toLowerCase(), reportType);
+                      setShowDownloadMenu(false);
+                    }}
+                    className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-100"
+                  >
+                    {format}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Send Mail */}
+          <button
+            onClick={() => setShowMailModal(true)}
+            className="flex items-center gap-2 px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 transition text-sm"
+          >
+            <FiMail /> Send Mail
+          </button>
+        </div>
+      </div>
 
       {/* Filters */}
       <div className="flex flex-wrap gap-4 mb-6 bg-white p-4 rounded-lg shadow">
@@ -360,57 +340,20 @@ export default function ReportGenerator() {
         </select>
       </div>
 
-      {/* Actions */}
-      <div className="flex gap-4 mb-6">
-        <button onClick={handleDownload} className="flex items-center gap-2 px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 transition">
-          <FiDownload /> Download Report
-        </button>
-        <button onClick={handleMail} className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition">
-          <FiMail /> Mail Report
-        </button>
-      </div>
-
       {/* Table */}
       <div className="overflow-x-auto">
         {loading ? (
           <div className="text-center p-4">Loading...</div>
         ) : error ? (
           <div className="text-center p-4 text-red-500">{error}</div>
+        ) : reportType === "summary" ? (
+          <SummaryTable leaves={leaves} />
         ) : (
-          <table className="min-w-full bg-white rounded-xl shadow">
-            <thead className="bg-gray-200 sticky top-0">
-              <tr>
-                <th className="px-6 py-3 text-left">Faculty</th>
-                <th className="px-6 py-3 text-left">Department</th>
-                <th className="px-6 py-3 text-left">Type</th>
-                <th className="px-6 py-3 text-left">Status</th>
-                <th className="px-6 py-3 text-left">Applied On</th>
-                <th className="px-6 py-3 text-left">From</th>
-                <th className="px-6 py-3 text-left">To</th>
-              </tr>
-            </thead>
-            <tbody>
-              {leaves.length > 0 ? (
-                leaves.map((l) => (
-                  <tr key={l.id} className="border-b hover:bg-gray-50">
-                    <td className="px-6 py-3">{l.faculty}</td>
-                    <td className="px-6 py-3">{l.dept}</td>
-                    <td className="px-6 py-3">{leaveTypes[l.type]?.fullName || l.type}</td>
-                    <td className="px-6 py-3">{l.status}</td>
-                    <td className="px-6 py-3">{l.appliedOn ?? l.appliedOnISO}</td>
-                    <td className="px-6 py-3">{l.fromDate}</td>
-                    <td className="px-6 py-3">{l.toDate}</td>
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan="7" className="p-4 text-center text-gray-500">No records found.</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+          <HistoryTable leaves={leaves} />
         )}
       </div>
+
+
 
       {/* Pagination */}
       <div className="flex justify-between items-center mt-6">
@@ -430,6 +373,39 @@ export default function ReportGenerator() {
           Next
         </button>
       </div>
+
+      {showMailModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-lg p-6 w-96">
+            <h2 className="text-lg font-semibold mb-4">Send Report via Mail</h2>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full border px-3 py-2 rounded mb-4"
+              placeholder="Enter email address"
+            />
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setShowMailModal(false)}
+                className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  handleMail(email);
+                  setShowMailModal(false);
+                }}
+                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+              >
+                Send
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

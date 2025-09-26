@@ -1,10 +1,10 @@
 // server.js
 import cors from "cors";
 import express from "express";
-import { userRoutes, sessionRoutes, leaveRoutes , reportRoutes} from "./routes/index.js";
+import { userRoutes, sessionRoutes, leaveRoutes , adminRoutes} from "./routes/index.js";
 import session from "express-session";
 import pgSession from "connect-pg-simple";
-import user from "./models/user.js"
+// import user from "./models/user.js"
 import { requireAuth } from "./middlewares/authSession.js";
 import {
   PORT,
@@ -15,6 +15,7 @@ import {
   SESS_LIFETIME,
   pgPool
 } from "./config.js";
+import bree from "./breeInstance.js";
 
 const PgSession = pgSession(session);
 
@@ -59,8 +60,9 @@ const PgSession = pgSession(session);
 
     app.use((req, res, next) => {
       console.log(
-        `${req.method} ${req.path} — Session:`,
-        req.session?.user || "No session"
+        `\n${req.method} ${req.path} — Session:`,
+        req.session?.user || "No session",
+        `\n`
       );
       next();
     });
@@ -73,13 +75,13 @@ const PgSession = pgSession(session);
     // <-- FOR PRODUCTION
     // apiRouter.use("/users", requireAuth, userRoutes);
     // apiRouter.use("/leave", requireAuth, leaveRoutes);
-    // apiRouter.use("/report",  reportRoutes);
+    // apiRouter.use("/admin", requireAuth, adminAuth, adminRoutes);
     // -->
 
     // <-- REMOVE IN PRODUCTION
     apiRouter.use("/users",  userRoutes);
     apiRouter.use("/leave",  leaveRoutes);
-    apiRouter.use("/report",  reportRoutes);
+    apiRouter.use("/admin",  adminRoutes);
     // -->
 
     // Start server (optional - could move to index.js)

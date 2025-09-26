@@ -1,6 +1,7 @@
+// src/pages/AdminReports.jsx
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { getLeaves, downloadReport, mailReport } from "../util/admin";
+import { getReportSummary, requestDownload } from "../util/admin"; // 
 import {
   BarChart,
   Bar,
@@ -9,7 +10,7 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
-import { FiDownload, FiMail, FiFileText } from "react-icons/fi";
+import { FiDownload, FiFileText } from "react-icons/fi";
 
 const AdminReports = () => {
   const navigate = useNavigate();
@@ -25,12 +26,27 @@ const AdminReports = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
+  // 🔹 Helper: trigger download with filters
+  const handleDownload = async (filters = {}, format = "csv") => {
+    try {
+      const res = await requestDownload(filters, format); // ✅ job-based backend
+      if (res?.success) {
+        alert("Report generation started. You will be notified when ready.");
+      } else {
+        alert("Failed to start report download.");
+      }
+    } catch (err) {
+      console.error("Download error:", err);
+      alert("Error starting report download");
+    }
+  };
+
   // 🚀 Load stats from API
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true);
-        const res = await getLeaves({ summary: true }); // ✅ backend should return summary + dept breakdown
+        const res = await getReportSummary({ summary: true }); 
         setStats(res.stats || {});
         setDeptReports(res.deptReports || []);
       } catch (err) {
@@ -61,12 +77,6 @@ const AdminReports = () => {
             className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 shadow"
           >
             <FiFileText /> Generate Reports
-          </button>
-          <button
-            onClick={() => mailReport({})}
-            className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 shadow"
-          >
-            <FiMail /> Mail Report
           </button>
         </div>
       </div>
@@ -118,7 +128,7 @@ const AdminReports = () => {
             <p>Rejected: {dept.rejected}</p>
             <p>Pending: {dept.pending}</p>
             <button
-              onClick={() => downloadReport({ dept: dept.name })}
+              onClick={() => handleDownload({ dept: dept.name }, "csv")}
               className="mt-3 flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 shadow"
             >
               <FiDownload /> Download CSV

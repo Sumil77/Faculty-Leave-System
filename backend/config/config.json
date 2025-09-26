@@ -1,0 +1,9 @@
+{
+  "development": {
+    "username": "postgres",
+    "password": "Hellotome@99",
+    "database": "faculty_leave",
+    "host": "127.0.0.1",
+    "dialect": "postgres"
+  }
+}

@@ -8,6 +8,8 @@ import { BrowserRouter } from "react-router-dom";
 
 // ✅ Start MSW in dev/mock mode
 if (import.meta.env.VITE_USE_MSW === "true") {
+  console.log("mockservicerunning");
+  
   const { worker } = await import("./mocks/browser");
   await worker.start({
     onUnhandledRequest: "bypass",

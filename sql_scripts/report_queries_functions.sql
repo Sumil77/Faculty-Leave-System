@@ -18,7 +18,9 @@ CREATE OR REPLACE FUNCTION get_dynamic_leave_summary(
     p_from DATE DEFAULT NULL,
     p_to DATE DEFAULT NULL,
     p_leave_type TEXT DEFAULT NULL,
-    p_order_by TEXT DEFAULT 'user_id'  -- Can be 'user_id', 'name', 'dept'
+    p_order_by TEXT DEFAULT 'user_id',  -- Can be 'user_id', 'name', 'dept'
+    p_limit INT DEFAULT 20,
+    p_offset INT DEFAULT 0
 )
 RETURNS JSON AS $$
 DECLARE
@@ -28,7 +30,7 @@ DECLARE
     dyn_sql TEXT;
     result JSON;
 BEGIN
-    -- Step 1: Build dynamic columns from leave_types
+    -- Dynamic columns
     SELECT string_agg(format('"%s" INT', "leaveType"), ', ')
     INTO col_defs
     FROM (SELECT DISTINCT "leaveType" FROM leave_types ORDER BY "leaveType") AS t;
@@ -37,7 +39,7 @@ BEGIN
     INTO col_aliases
     FROM (SELECT DISTINCT "leaveType" FROM leave_types ORDER BY "leaveType") AS t;
 
-    -- Step 2: Build WHERE filter conditions as text
+    -- Filters
     IF p_user_id IS NOT NULL THEN
         filter_sql := filter_sql || format(' AND l.user_id = %s', p_user_id);
     END IF;
@@ -54,11 +56,10 @@ BEGIN
         filter_sql := filter_sql || format(' AND l."leaveType" = %L', p_leave_type);
     END IF;
 
-    -- Step 3: Build full dynamic SQL
+    -- Dynamic SQL with LIMIT/OFFSET
     dyn_sql := format(
         $q$
-        SELECT json_agg(row_to_json(ct3))
-        FROM (
+        WITH all_rows AS (
             SELECT u.user_id, u.name, u.dept, %s
             FROM (
                 SELECT * FROM crosstab(
@@ -75,12 +76,20 @@ BEGIN
             ) AS ct
             JOIN public."User" u ON u.user_id = ct.user_id
             ORDER BY %I
-        ) AS ct3
-        $q$,
-        col_aliases, filter_sql, col_defs, p_order_by
+        ),
+        paged_rows AS (
+            SELECT * FROM all_rows
+            LIMIT %s OFFSET %s
+        )
+        SELECT json_build_object(
+            'totalCount', (SELECT COUNT(*) FROM all_rows),
+            'rows', COALESCE(json_agg(row_to_json(paged_rows)), '[]'::json)
+        )
+        FROM paged_rows
+    $q$,
+        col_aliases, filter_sql, col_defs, p_order_by, p_limit, p_offset
     );
 
-    -- Step 4: Execute the dynamic SQL
     EXECUTE dyn_sql INTO result;
 
     RETURN result;
@@ -88,12 +97,16 @@ END;
 $$ LANGUAGE plpgsql;
 
 
+
 CREATE OR REPLACE FUNCTION get_leave_history_json(
     p_user_ids INT[] DEFAULT NULL,
     p_dept TEXT DEFAULT NULL,
     p_from DATE DEFAULT NULL,
     p_to DATE DEFAULT NULL,
-    p_leave_type TEXT DEFAULT NULL
+    p_leave_type TEXT DEFAULT NULL,
+    p_order_by TEXT DEFAULT 'user_id',
+    p_limit INT DEFAULT 20,
+    p_offset INT DEFAULT 0
 )
 RETURNS JSON AS $$
 DECLARE
@@ -101,9 +114,9 @@ DECLARE
     dyn_sql TEXT;
     result JSON;
 BEGIN
-    -- Step 1: Build filters
+    -- Filters
     IF p_user_ids IS NOT NULL THEN
-        filter_sql := filter_sql || format(' AND l.user_id = ANY (ARRAY[%s])', array_to_string(p_user_ids, ','));
+        filter_sql := filter_sql || format(' AND l.user_id = ANY (p_user_ids)');
     END IF;
     IF p_dept IS NOT NULL THEN
         filter_sql := filter_sql || format(' AND u.dept = %L', p_dept);
@@ -118,15 +131,21 @@ BEGIN
         filter_sql := filter_sql || format(' AND l."leaveType" = %L', p_leave_type);
     END IF;
 
-    -- Step 2: Dynamic SQL for grouped JSON
+    -- Whitelist order_by
+    IF p_order_by NOT IN ('user_id','name','desig','dept') THEN
+        p_order_by := 'user_id';
+    END IF;
+
+    -- Dynamic SQL with CTE for total + pagination
     dyn_sql := format($q$
-        SELECT json_agg(user_data) FROM (
+        WITH all_rows AS (
             SELECT 
                 u.user_id,
                 u.name,
-                u.designation,
+                u.desig,
+                u.dept,
                 (
-                    SELECT json_agg(row_to_json(leave_row))
+                    SELECT COALESCE(json_agg(row_to_json(leave_row)), '[]'::json)
                     FROM (
                         SELECT 
                             l."appliedOn",
@@ -145,16 +164,25 @@ BEGIN
                 SELECT 1 FROM public."LeaveApproved" l
                 WHERE l.user_id = u.user_id %s
             )
-            ORDER BY u.name
-        ) AS user_data
-    $q$, filter_sql, filter_sql);
+            ORDER BY %I
+        ),
+        paged_rows AS (
+            SELECT * FROM all_rows
+            LIMIT %s OFFSET %s
+        )
+        SELECT json_build_object(
+            'totalCount', (SELECT COUNT(*) FROM all_rows),
+            'rows', COALESCE(json_agg(row_to_json(paged_rows)), '[]'::json)
+        )
+        FROM paged_rows
+    $q$, filter_sql, filter_sql, p_order_by, p_limit, p_offset);
 
-    -- Step 3: Execute
     EXECUTE dyn_sql INTO result;
-
     RETURN result;
 END;
 $$ LANGUAGE plpgsql;
+
+
 
 
 drop function get_dynamic_leave_summary();

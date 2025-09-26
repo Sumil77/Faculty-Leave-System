@@ -3,14 +3,14 @@ import { apiRequest } from "./api.js";
 export const signup = (user) => {
   return apiRequest("/api/users", {
     method: "POST",
-    body: user,
+    body: JSON.stringify(user),
   });
 };
 
 export const login = (user) => {
   return apiRequest("/api/session", {
     method: "POST",
-    body: user,
+    body: JSON.stringify(user),
   });
 };
 
