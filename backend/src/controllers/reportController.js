@@ -19,6 +19,7 @@ import {
   LeavePending,
   CompensatoryLeave,
 } from "../models/index.js";
+import { reportQueue } from "../queues/reportQueue.js"; // BullMQ queue
 
 const leaveTypeKeys = Object.keys(leaveTypes); // ['casual', 'medical', ...]
 
@@ -253,46 +254,12 @@ export const requestDownload = async (req, res) => {
     const jobPath = path.join(__dirname, "../jobs/downloadReport.js");
 
     // Add job to Bree
-    await bree.add({
-      name: jobName,
-      path: jobPath,
-      worker: { workerData: { jobId: jobName, filters, format, type } },
+    await reportQueue.add("downloadReport", {
+      jobId: jobName,
+      filters,
+      format,
+      type,
     });
-
-    // Start job
-    bree.start(jobName);
-
-    // Cleanup function
-    const cleanup = () => {
-      if (bree.workers[jobName]) {
-        bree.workers[jobName].worker.terminate();
-        delete bree.workers[jobName];
-      }
-    };
-
-    // Worker listeners
-    const onMessage = (name, msg) => {
-      if (name === jobName) {
-        console.log(`Job "${jobName}" message:`, msg);
-        cleanup();
-      }
-    };
-    const onError = (name, err) => {
-      if (name === jobName) {
-        console.error(`Job "${jobName}" error:`, err);
-        cleanup();
-      }
-    };
-    const onExit = (name) => {
-      if (name === jobName) {
-        console.log(`Job "${jobName}" exited.`);
-        cleanup();
-      }
-    };
-
-    bree.on("workerMessage", onMessage);
-    bree.on("workerError", onError);
-    bree.on("workerExit", onExit);
 
     res.json({ success: true, jobId: jobName });
   } catch (err) {
@@ -354,50 +321,7 @@ export const sendMail = async (req, res) => {
     const jobPath = path.join(__dirname, "../jobs/sendReportMail.js");
 
     // Add job to Bree
-    await bree.add({
-      name: jobName,
-      path: jobPath,
-      worker: { workerData: { email, filters } },
-    });
-
-    // Start the job
-    bree.start(jobName);
-
-    // Cleanup and logging
-    const cleanup = () => {
-      if (bree.workers[jobName]) {
-        bree.workers[jobName].worker.terminate();
-        delete bree.workers[jobName];
-      }
-    };
-
-    // Listen for worker messages
-    const onMessage = (name, msg) => {
-      if (name === jobName) {
-        console.log(`Job "${jobName}" message:`, msg);
-        cleanup();
-      }
-    };
-
-    // Listen for worker errors
-    const onError = (name, err) => {
-      if (name === jobName) {
-        console.error(`Job "${jobName}" error:`, err);
-        cleanup();
-      }
-    };
-
-    // Listen for worker exits
-    const onExit = (name) => {
-      if (name === jobName) {
-        console.log(`Job "${jobName}" exited.`);
-        cleanup();
-      }
-    };
-
-    bree.on("workerMessage", onMessage);
-    bree.on("workerError", onError);
-    bree.on("workerExit", onExit);
+    await reportQueue.add("sendReportMail", { jobId: jobName, email, filters });
 
     res.json({ success: true, message: `Report job queued for ${email}.` });
   } catch (err) {
@@ -451,41 +375,11 @@ export const sendHistoryMail = async (req, res) => {
     const jobName = `historyMail-${uuidv4()}`;
     const jobPath = path.join(__dirname, "../jobs/sendHistoryMail.js");
 
-    await bree.add({
-      name: jobName,
-      path: jobPath,
-      worker: { workerData: { email, filters } },
+    await reportQueue.add("sendHistoryMail", {
+      jobId: jobName,
+      email,
+      filters,
     });
-
-    bree.start(jobName);
-
-    // Optional: listen for worker messages
-    const onMessage = (name, msg) => {
-      if (name === jobName) {
-        console.log(`[${jobName}] message:`, msg);
-        bree.workers[jobName]?.worker.terminate();
-        delete bree.workers[jobName];
-      }
-    };
-
-    const onError = (name, err) => {
-      if (name === jobName) {
-        console.error(`[${jobName}] error:`, err);
-        bree.workers[jobName]?.worker.terminate();
-        delete bree.workers[jobName];
-      }
-    };
-
-    const onExit = (name) => {
-      if (name === jobName) {
-        console.log(`[${jobName}] exited`);
-        delete bree.workers[jobName];
-      }
-    };
-
-    bree.on("workerMessage", onMessage);
-    bree.on("workerError", onError);
-    bree.on("workerExit", onExit);
 
     res.json({
       success: true,
