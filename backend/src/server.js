@@ -16,6 +16,8 @@ import {
   pgPool
 } from "./config.js";
 import bree from "./breeInstance.js";
+import { reportQueue } from "./queues/reportQueue.js";
+import setupBullBoard from "./bullbord.js";
 
 const PgSession = pgSession(session);
 
@@ -60,9 +62,8 @@ const PgSession = pgSession(session);
 
     app.use((req, res, next) => {
       console.log(
-        `\n${req.method} ${req.path} — Session:`,
+        `${req.method} ${req.path} — Session:`,
         req.session?.user || "No session",
-        `\n`
       );
       next();
     });
@@ -83,6 +84,8 @@ const PgSession = pgSession(session);
     apiRouter.use("/leave",  leaveRoutes);
     apiRouter.use("/admin",  adminRoutes);
     // -->
+
+    setupBullBoard(app);
 
     // Start server (optional - could move to index.js)
     app.listen(PORT, () => console.log(`Listening on port ${PORT}`));

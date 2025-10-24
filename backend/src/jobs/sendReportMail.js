@@ -1,34 +1,39 @@
-import { parentPort, workerData } from "worker_threads";
 import { generateAndSendReport } from "../services/reportService.js";
 import { logJobError } from "../utils/jobLogger.js";
 
 const MAX_RETRIES = 3;
-const BASE_DELAY_MS = 2000; // 2 seconds initial delay
+const BASE_DELAY_MS = 2000;
 
-const runJob = async () => {
+process.on("message", async (data) => {
+  const { email, filters } = data;
   let attempts = 0;
 
   while (attempts < MAX_RETRIES) {
     try {
-      await generateAndSendReport(workerData.email, workerData.filters);
-      parentPort.postMessage(`History mail sent to ${workerData.email}`);
+      await generateAndSendReport(email, filters);
+
+      if (process.send)
+        process.send({
+          success: true,
+          message: `Report mail sent to ${email}`,
+        });
       return;
     } catch (err) {
       attempts++;
-      await logJobError(workerData, err, attempts);
+      await logJobError({ email, filters }, err, attempts);
 
       if (attempts >= MAX_RETRIES) {
-        parentPort.postMessage(
-          `Failed to send history mail to ${workerData.email} after ${MAX_RETRIES} attempts`
-        );
+        if (process.send)
+          process.send({
+            success: false,
+            message: `Failed to send report mail to ${email} after ${MAX_RETRIES} attempts`,
+            error: err.message,
+          });
         return;
       }
 
-      // add delay before retry (exponential backoff)
       const delay = BASE_DELAY_MS * attempts;
       await new Promise((resolve) => setTimeout(resolve, delay));
     }
   }
-};
-
-runJob();
+});
