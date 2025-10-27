@@ -220,22 +220,37 @@ export async function generateHistoryPDF(data) {
     "Days",
   ];
 
-  const rows = data.map((leave) => [
-    leave.user_id,
-    leave.name,
-    leave.dept,
-    formatDate(leave.appliedOn),
-    formatDate(leave.fromDate),
-    formatDate(leave.toDate),
-    leave.leaveType,
-    leave.totalDays,
-  ]);
+  // ✅ Flatten nested structure on the fly
+  const rows = data.flatMap((user) =>
+    (user.leaves || []).map((leave) => [
+      user.user_id,
+      user.name,
+      user.dept,
+      formatDate(leave.appliedOn),
+      formatDate(leave.fromDate),
+      formatDate(leave.toDate),
+      leave.leaveType,
+      leave.totalDays,
+    ])
+  );
+
+  if (rows.length === 0) {
+    const page = pdfDoc.addPage();
+    page.drawText("No leave records found.", {
+      x: margin,
+      y: page.getHeight() - margin,
+      size: 14,
+      font,
+      color: rgb(0.6, 0, 0),
+    });
+    return Buffer.from(await pdfDoc.save());
+  }
 
   const getTextWidth = (text) => font.widthOfTextAtSize(String(text), fontSize);
 
   const colWidths = headers.map((header, i) => {
     const headerWidth = getTextWidth(header);
-    const dataWidth = Math.max(...rows.map((row) => getTextWidth(row[i])));
+    const dataWidth = Math.max(...rows.map((row) => getTextWidth(row[i] ?? "")));
     return Math.max(headerWidth, dataWidth) + colPadding * 2;
   });
 
@@ -273,14 +288,16 @@ export async function generateHistoryPDF(data) {
     });
   };
 
+  // Draw header
   drawRow(headers, true);
   y -= rowHeight;
 
+  // Draw data rows
   for (const row of rows) {
     if (y - rowHeight < margin) {
       page = pdfDoc.addPage();
-      y = pageHeight - margin;
-      drawRow(headers, true);
+      y = page.getHeight() - margin;
+      drawRow(headers, true); // repeat header
       y -= rowHeight;
     }
     drawRow(row);
@@ -290,6 +307,7 @@ export async function generateHistoryPDF(data) {
   const pdfBytes = await pdfDoc.save();
   return Buffer.from(pdfBytes);
 }
+
 
 export async function getSummary(filters = {}) {
   try {

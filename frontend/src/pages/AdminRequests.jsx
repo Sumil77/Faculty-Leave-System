@@ -56,9 +56,9 @@ export default function AdminRequests() {
         search: filters.search || undefined,
         status: filters.status !== "All" ? filters.status : undefined,
         dept: filters.dept !== "All" ? filters.dept : undefined,
-        leaveType: filters.leaveType || undefined,  // <-- ADD THIS LINE
-        from: filters.fromDate || undefined, // <-- backend expects "from"
-        to: filters.toDate || undefined,     // <-- backend expects "to"
+        leaveType: filters.leaveType || undefined,
+        from: filters.fromDate || undefined, 
+        to: filters.toDate || undefined,     
         appliedFrom: filters.appliedFrom || undefined,
         appliedTo: filters.appliedTo || undefined,
         page,

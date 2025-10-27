@@ -1,6 +1,6 @@
 import { DataTypes, Model } from "sequelize";
 import { sequelize } from "../config.js"; // your sequelize instance
-import User from "./User.js"; // adjust path as needed
+import User from "./user.js"; // adjust path as needed
 
 class LeaveRejected extends Model {
   // Static method to check field uniqueness

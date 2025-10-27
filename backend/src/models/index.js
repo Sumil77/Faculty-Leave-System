@@ -1,4 +1,4 @@
-import User from "./User.js";
+import User from "./user.js";
 import LeaveApproved from "./leaveApproved.js";
 import LeaveRejected from "./leaveRejected.js";
 import LeavePending from "./leavePending.js";

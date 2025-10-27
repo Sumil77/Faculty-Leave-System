@@ -1,12 +1,11 @@
-import { parentPort, workerData } from "worker_threads";
 import path from "path";
 import fs from "fs";
 import {
   generateCSV,
   generateExcel,
   generatePDF,
-  generateHistoryExcel,
   generateHistoryCSV,
+  generateHistoryExcel,
   generateHistoryPDF,
   getSummaryForMail,
   getHistoryForMail,
@@ -14,36 +13,35 @@ import {
 
 const formatMap = { csv: "csv", excel: "xlsx", pdf: "pdf" };
 
-(async () => {
+process.on("message", async (data) => {
+  const { jobId, filters, format, type } = data;
+
   try {
-    const { jobId, filters, format, type } = workerData;
     const outputDir = path.join(process.cwd(), "tmp", "reports");
     if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir, { recursive: true });
 
-    const data =
+    const reportData =
       type === "summary"
         ? await getSummaryForMail(filters)
         : await getHistoryForMail(filters);
 
     let buffer;
     if (type === "summary") {
-      if (format === "csv") buffer = await generateCSV(data);
-      if (format === "excel") buffer = await generateExcel(data);
-      if (format === "pdf") buffer = await generatePDF(data);
+      if (format === "csv") buffer = await generateCSV(reportData);
+      if (format === "excel") buffer = await generateExcel(reportData);
+      if (format === "pdf") buffer = await generatePDF(reportData);
     } else {
-        console.log("elseeeeeeeeeeeeeeeeeeeeeeeeeeeeeee");
-        
-      if (format === "csv") buffer = await generateHistoryCSV(data);
-      if (format === "excel") buffer = await generateHistoryExcel(data);
-      if (format === "pdf") buffer = await generateHistoryPDF(data);
+      if (format === "csv") buffer = await generateHistoryCSV(reportData);
+      if (format === "excel") buffer = await generateHistoryExcel(reportData);
+      if (format === "pdf") buffer = await generateHistoryPDF(reportData);
     }
 
     const ext = formatMap[format] || format;
     const filePath = path.join(outputDir, `${jobId}.${ext}`);
     fs.writeFileSync(filePath, buffer);
 
-    parentPort.postMessage({ success: true });
+    if (process.send) process.send({ success: true, filePath });
   } catch (err) {
-    parentPort.postMessage({ success: false, error: err.message });
+    if (process.send) process.send({ success: false, error: err.message });
   }
-})();
+});

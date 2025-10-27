@@ -1,5 +1,11 @@
-import {LeaveApproved, LeaveRejected, LeavePending, LeaveBalance, LeaveTaken} from "../models/index.js"
-import { col, fn, literal, Op } from "sequelize";
+import {
+  LeaveApproved,
+  LeaveRejected,
+  LeavePending,
+  LeaveBalance,
+  LeaveTaken,
+} from "../models/index.js";
+import { literal, Op } from "sequelize";
 import {
   leaveSchema,
   validateLeaveBalance,
@@ -217,6 +223,47 @@ export const getLeaveTaken = async (req, res) => {
   });
 };
 
+export const getRecentLeaves = async (req, res) => {
+  try {
+    // const user_id = req.query.user_id;
+    const user = req.session.user;
+
+    const today = new Date();
+    const monthAgo = new Date();
+    monthAgo.setMonth(today.getMonth() - 1);
+    const [pending, approved] = await Promise.all([
+      LeavePending.findAll({
+        where: {
+          user_id: user.user_id,
+          fromDate: { [Op.between]: [monthAgo, today] },
+        },
+      }),
+      LeaveApproved.findAll({
+        where: {
+          user_id: user.user_id,
+          fromDate: { [Op.between]: [monthAgo, today] },
+        },
+      }),
+    ]);
+
+    const tagged = pending
+      .map((p) => ({ ...p.dataValues, status: "Pending" }))
+      .concat(approved.map((a) => ({ ...a.dataValues, status: "Approved" })));
+
+    const recents = tagged.sort(
+      (a, b) => new Date(b.appliedOn) - new Date(a.appliedOn)
+    );
+
+    console.log(recents.map((l) => l.id));
+
+    return res.status(200).json(recents);
+  } catch (error) {
+    console.error("Error Recent Leaves:", error);
+
+    return res.status(500).send(parseError(error));
+  }
+};
+
 export const postAppliedLeave = async (req, res) => {
   const user_id = req.session.user.user_id;
   const dept = req.session.user.dept;
@@ -303,47 +350,6 @@ export const postCancelPending = async (req, res) => {
   } catch (error) {
     await transaction.rollback();
     console.log("Cancel Leave Failed:", error);
-    return res.status(500).send(parseError(error));
-  }
-};
-
-export const getRecentLeaves = async (req, res) => {
-  try {
-    // const user_id = req.query.user_id;
-    const user = req.session.user;
-
-    const today = new Date();
-    const monthAgo = new Date();
-    monthAgo.setMonth(today.getMonth() - 1);
-    const [pending, approved] = await Promise.all([
-      LeavePending.findAll({
-        where: {
-          user_id: user.user_id,
-          fromDate: { [Op.between]: [monthAgo, today] },
-        },
-      }),
-      LeaveApproved.findAll({
-        where: {
-          user_id: user.user_id,
-          fromDate: { [Op.between]: [monthAgo, today] },
-        },
-      }),
-    ]);
-
-    const tagged = pending
-      .map((p) => ({ ...p.dataValues, status: "Pending" }))
-      .concat(approved.map((a) => ({ ...a.dataValues, status: "Approved" })));
-
-    const recents = tagged.sort(
-      (a, b) => new Date(b.appliedOn) - new Date(a.appliedOn)
-    );
-
-    console.log(recents.map((l) => l.id));
-
-    return res.status(200).json(recents);
-  } catch (error) {
-    console.error("Error Recent Leaves:", error);
-
     return res.status(500).send(parseError(error));
   }
 };

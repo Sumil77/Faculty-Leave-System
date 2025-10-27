@@ -12,15 +12,10 @@ const adminRouter = express.Router();
 
 adminRouter.get("/getUsers", adminController.getUsers);
 adminRouter.get("/getRequests", adminController.getRequests);
-adminRouter.get("/getLeaves", adminController.getLeaves);
-adminRouter.get("/getSummary", adminController.getSummary);
-adminRouter.get("downloadReport", adminController.downloadReport);
 
 adminRouter.post("/approve", adminController.approveLeaves);
 adminRouter.post("/reject", adminController.rejectLeaves);
 adminRouter.post("/grant-cpl", adminController.grantCpl);
-adminRouter.post("/postUser", adminController.postUser);
-adminRouter.post("/mailReport", adminController.mailReport);
 
 adminRouter.patch("/patchUser", adminController.patchUsers);
 
@@ -31,8 +26,7 @@ adminRouter.get("/download-request", reportController.requestDownload);
 adminRouter.get("/download-status/:jobId", reportController.checkDownload); 
 adminRouter.get("/downloads/:jobId.:format", reportController.serveDownload);
 
-
-adminRouter.get("/report-summary", reportController.getReportSummary)
+adminRouter.get("/report-summary", reportController.getReportSummary);
 adminRouter.get("/leave-summary", reportController.getLeaveSummary);
 adminRouter.get("/leave-history", reportController.getLeaveHistory);
 adminRouter.get("/download-history", reportController.downloadHistory);
