@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import TypeOfLeaveImg from '../assets/Leaves.png';
+import * as leaveController from "../util/leave";
 
 
 const ApplyLeave = () => {
@@ -16,19 +17,7 @@ const ApplyLeave = () => {
   const [isCancelEnabled, setIsCancelEnabled] = useState(false);
   const [submittedLeave, setSubmittedLeave] = useState(null);
 
-  const leaveTypes = [
-    "Casual Leave",
-    "Medical Leave",
-    "Special Casual Leave",
-    "Extra Ordinary Leave",
-    "Earned Leave",
-    "On Duty Leave (Exam Purpose)",
-    "On Duty Leave (Other)",
-    "Maternity Leave",
-    "Election Leave",
-    "Compensatory Leave",
-    "Without Pay Leave",
-  ];
+  const leaveTypes = leaveController.leaveTypes;
 
   const generateTimeOptions = () => {
     const times = [];
@@ -98,7 +87,7 @@ const ApplyLeave = () => {
   };
 
   // Handle submit logic
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
     if (new Date(leaveDurationFrom) > new Date(leaveDurationTo)) {
@@ -153,6 +142,7 @@ const ApplyLeave = () => {
         alert("Timing exceeds Half Day. Please select Full Day leave.");
         return;
       }
+
     }
 
     // Calculate leave days taken
@@ -175,6 +165,17 @@ const ApplyLeave = () => {
       totalDays: totalLeaveTaken,
       leaveHours: leaveHours, // Include calculated leave hours
     });
+
+    const today = (new Date()).toISOString();
+    const leave = {
+      time: today,
+      from: leaveDurationFrom,
+      to: leaveDurationTo,
+      type: leaveType
+    };
+
+
+    await leaveController.postLeavePending(leave)
 
     setIsCancelEnabled(true);
     setTimeout(() => setIsCancelEnabled(false), 15 * 60 * 1000);
@@ -250,8 +251,10 @@ const ApplyLeave = () => {
               className="border rounded-lg p-3 w-full"
             >
               <option value="">Select Leave Type</option>
-              {leaveTypes.map((type, idx) => (
-                <option key={idx} value={type}>{type}</option>
+              {Object.entries(leaveTypes).map(([key, type], idx) => (
+                <option key={idx} value={key}>
+                  {type.fullName}
+                </option>
               ))}
             </select>
           </div>

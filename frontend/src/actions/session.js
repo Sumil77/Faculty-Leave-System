@@ -9,40 +9,35 @@ export const receiveCurrentUser = (user) => ({
   user,
 });
 
-
 export const logoutCurrentUser = () => ({
   type: LOGOUT_CURRENT_USER,
 });
 
 export const login = (user) => async (dispatch) => {
-  const response = await apiUtil.login(user);
-
-  const data = await response.json();
-  console.log(data);
-  if (response.ok) {
-    return dispatch(receiveCurrentUser(data));
+  try {
+    const data = await apiUtil.login(user); // already parsed JSON
+    dispatch(receiveCurrentUser(data));
+    return data; // <-- important: allows caller to await login
+  } catch (err) {
+    dispatch(receiveErrors(err.message || "Login failed"));
+    throw err;
   }
-  console.log(data);
-  return dispatch(receiveErrors(data.message));
 };
 
-
 export const signup = (user) => async (dispatch) => {
-  const response = await apiUtil.signup(user);
-  const data = await response.json();
-
-  if (response.ok) {
+  try {
+    const data = await apiUtil.signup(user); // already parsed JSON
     return dispatch(receiveCurrentUser(data));
+  } catch (err) {
+    return dispatch(receiveErrors(err.message || "Signup failed"));
   }
-  return dispatch(receiveErrors(data));
 };
 
 export const logout = () => async (dispatch) => {
-  const response = await apiUtil.logout();
-  console.log("logout triggered");
-  const data = await response.json();
-  if (response.ok) {
+  try {
+    const data = await apiUtil.logout(); // already parsed JSON
     return dispatch(logoutCurrentUser());
+  } catch (err) {
+    return dispatch(receiveErrors(err.message || "Logout failed"));
   }
-  return dispatch(receiveErrors(data));
 };

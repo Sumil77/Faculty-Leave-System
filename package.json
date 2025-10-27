@@ -2,9 +2,15 @@
   "scripts": {
     "dev": "npm --prefix frontend run dev",
     "dev:back": "npm --prefix frontend run prod",
-    "prod": "concurrently \"npm --prefix backend run dev\" \"npm --prefix frontend run prod\""
+    "prod": "concurrently \"npm --prefix backend run dev\" \"npm --prefix frontend run prod\"",
+    "build": "concurrently \"npm --prefix backend run dev\" \"npm --prefix frontend run build\""
   },
   "devDependencies": {
     "concurrently": "^8.0.0"
+  },
+  "dependencies": {
+    "bullmq": "^5.61.2",
+    "dotenv": "^17.2.3",
+    "ioredis": "^5.8.2"
   }
 }

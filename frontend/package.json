@@ -13,6 +13,7 @@
   "dependencies": {
     "@reduxjs/toolkit": "^2.6.1",
     "axios": "^1.8.4",
+    "framer-motion": "^12.23.12",
     "html2canvas": "^1.4.1",
     "jspdf": "^3.0.1",
     "moment": "^2.30.1",
@@ -24,6 +25,7 @@
     "react-icons": "^5.5.0",
     "react-redux": "^9.2.0",
     "react-router-dom": "^7.5.0",
+    "recharts": "^3.1.2",
     "redux": "^5.0.1",
     "redux-thunk": "^3.1.0",
     "typed.js": "^2.1.0"
@@ -39,9 +41,15 @@
     "eslint-plugin-react-hooks": "^5.0.0",
     "eslint-plugin-react-refresh": "^0.4.19",
     "globals": "^15.15.0",
+    "msw": "^2.11.0",
     "postcss": "^8.5.3",
     "tailwindcss": "^3.4.17",
     "vite": "^6.2.6"
   },
-  "proxy": "http://localhost:5000"
+  "proxy": "http://localhost:5000",
+  "msw": {
+    "workerDirectory": [
+      "public"
+    ]
+  }
 }

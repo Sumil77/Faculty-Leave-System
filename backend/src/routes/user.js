@@ -1,32 +1,12 @@
-import Joi from "joi";
-import express from 'express';
-import User from '../models/user.js';
-import { signUp } from '../validations/user.js';
-import { parseError, sessionizeUser } from "../util/helpers.js";
+import express from "express";
+import * as userController from "../controllers/userController.js";
 
 const userRouter = express.Router();
 
-userRouter.post("", async (req, res) => {
-    try {
-      const { username, email, password } = req.body;
-  
-      // Validate with Joi
-      await signUp.validateAsync({ username, email, password });
-  
-      // Create the new user, hashing will be handled in Sequelize hooks
-      const newUser = await User.create({ username, email, password });
-      const sessionUser = sessionizeUser(newUser);
+userRouter.get("/me", userController.getUser);
 
-      req.session.user = sessionUser;
-      console.log(req.session)
-  
-      res.status(201).send(sessionUser);
-    } catch (err) {
-      console.error(err);
-  
-      // Handle validation or Sequelize errors
-      const status = err.name === "SequelizeValidationError" ? 400 : 500;
-      res.status(status).send(parseError(err));
-    }
-  });
+userRouter.post("", userController.createUser);
+
+userRouter.patch("", userController.updateUser)
+
 export default userRouter;

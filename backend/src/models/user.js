@@ -1,73 +1,50 @@
-import { DataTypes, Model } from 'sequelize';
-import bcrypt from 'bcryptjs';
-import { sequelize } from '../config.js'; // your sequelize instance
+import { DataTypes, Model } from "sequelize";
+import { sequelize } from "../config.js"; // your sequelize instance
+import LeaveApproved from "./leaveApproved.js";
+import LeaveRejected from "./leaveRejected.js";
+import LeavePending from "./leavePending.js";
+import LeaveBalance from "./leaveBalance.js";
+import LeaveTaken from "./leaveTaken.js";
+import CompensatoryLeave from "./CompensatoryLeave.js";
 
 class User extends Model {
-    // Instance method to compare password
-    comparePasswords(password) {
-      return bcrypt.compareSync(password, this.password);
-    }
-  
-    // Static method to check field uniqueness
-    static async doesNotExist(field) {
-      const count = await User.count({ where: field });
-      return count === 0;
-    }
-  }
-  
-  User.init(
-    {
-      username: {
-        type: DataTypes.STRING,
-        allowNull: false,
-        unique: {
-          msg: 'Username already exists',
-        },
-        validate: {
-          async isUnique(value) {
-            const exists = await User.count({ where: { username: value } });
-            if (exists) {
-              throw new Error('Username already exists');
-            }
-          },
-        },
-      },
-      email: {
-        type: DataTypes.STRING,
-        allowNull: false,
-        unique: {
-          msg: 'Email already exists',
-        },
-        validate: {
-          isEmail: { msg: 'Must be a valid email' },
-          async isUnique(value) {
-            const exists = await User.count({ where: { email: value } });
-            if (exists) {
-              throw new Error('Email already exists');
-            }
-          },
-        },
-      },
-      password: {
-        type: DataTypes.STRING,
-        allowNull: false,
+  // Static method to check field uniqueness
+  // static async doesNotExist(field) {
+  //   const count = await User.count({ where: field });
+  //   return count === 0;
+  // }
+}
+
+User.init(
+  {
+    user_id: {
+      type: DataTypes.BIGINT,
+      allowNull: false,
+      primaryKey: true,
+      unique: true,
+    },
+    email: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      unique: true, // DB-level unique
+      validate: {
+        isEmail: { msg: "Must be a valid email" },
       },
     },
-    {
-      sequelize,
-      modelName: 'User',
-      timestamps: true,
-      hooks: {
-        beforeCreate: async (user) => {
-          user.password = await bcrypt.hash(user.password, 10);
-        },
-        beforeUpdate: async (user) => {
-          if (user.changed('password')) {
-            user.password = await bcrypt.hash(user.password, 10);
-          }
-        },
-      },
-    }
-  );
-  
-  export default User;
+    name: { type: DataTypes.STRING, allowNull: false },
+    desig: { type: DataTypes.STRING, allowNull: false },
+    dept: { type: DataTypes.STRING, allowNull: false },
+    phno: { type: DataTypes.STRING, allowNull: false },
+    dateOfJoining: { type: DataTypes.DATEONLY, allowNull: false },
+  },
+  {
+    sequelize,
+    modelName: "User",
+    timestamps: true,
+    paranoid: true, // enable soft deletes
+    deletedAt: "deletedAt",
+  }
+);
+
+
+export default User;

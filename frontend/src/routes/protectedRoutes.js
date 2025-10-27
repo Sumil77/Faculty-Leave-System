@@ -4,32 +4,29 @@ import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { checkLoggedIn } from "../util/session.js";
 import { receiveCurrentUser, logout } from "../actions/session.js"; // adjust path if needed
 
-const ProtectedRoute = ({ redirectPath = "/login", children }) => {
-  const isLoggedIn = useSelector((state) => Boolean(state.session?.userId));
-  const [checking, setChecking] = useState(true);
-  const location = useLocation();
+export const ProtectedRoute = ({ children }) => {
+  const loggedIn = useSelector((state) => Boolean(state.session?.user_id));
   const dispatch = useDispatch();
+  const [checking, setChecking] = useState(true);
 
   useEffect(() => {
-    const verifySession = async () => {
-      const sessionState = await checkLoggedIn();
-      if (sessionState.session) {
-        dispatch(receiveCurrentUser(sessionState.session));
-      } else {
+    const validateSession = async () => {
+      try {
+        const data = await apiRequest("/api/session", { method: "GET" });
+        if (data?.user_id) {
+          dispatch(receiveCurrentUser(data));
+        }
+      } catch {
         dispatch(logout());
+      } finally {
+        setChecking(false);
       }
-      setChecking(false);
     };
-
-    verifySession();
+    validateSession();
   }, [dispatch]);
 
   if (checking) return <div>Checking session...</div>;
-
-  if (!isLoggedIn) {
-    return <Navigate to={redirectPath} state={{ from: location }} replace />;
-  }
-
+  if (!loggedIn) return <Navigate to="/login" replace />;
   return children ? children : <Outlet />;
 };
 

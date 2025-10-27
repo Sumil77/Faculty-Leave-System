@@ -22,29 +22,21 @@ const Login = () => {
   const dispatch = useDispatch();
   const errors = useSelector((state) => state.errors); // Assuming errors are stored in state.errors
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!department || !email || !password || !userCaptcha) {
-      setError("All fields are required!");
-      return;
+    const user = { email, password };
+
+    try {
+      const data = await dispatch(login(user));
+      if (data?.user_id) {
+        navigate("/dashboard"); // navigate only after successful login
+      } else {
+        setError("Invalid credentials");
+      }
+    } catch (err) {
+      setError(err.message || "Login failed");
     }
-
-    if (userCaptcha !== captcha) {
-      setError("Invalid Captcha. Please try again.");
-      setCaptcha(generateCaptcha()); // Reset captcha
-      setUserCaptcha("");
-      return;
-    }
-
-    const user = {
-      email: email,
-      password: password,
-    };
-
-    dispatch(login(user)); // Dispatch the login action
-    
-    // Optionally, add redirect logic here after login is successful
   };
 
   return (
