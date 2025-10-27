@@ -1,11 +1,15 @@
 // server.js
 import cors from "cors";
 import express from "express";
-import { userRoutes, sessionRoutes, leaveRoutes , adminRoutes} from "./routes/index.js";
+import {
+  userRoutes,
+  sessionRoutes,
+  leaveRoutes,
+  adminRoutes,
+} from "./routes/index.js";
 import session from "express-session";
 import pgSession from "connect-pg-simple";
 // import user from "./models/user.js"
-import { requireAuth } from "./middlewares/authSession.js";
 import {
   PORT,
   NODE_ENV,
@@ -13,11 +17,13 @@ import {
   SESS_NAME,
   SESS_SECRET,
   SESS_LIFETIME,
-  pgPool
+  pgPool,
 } from "./config.js";
-import bree from "./breeInstance.js";
-import { reportQueue } from "./queues/reportQueue.js";
 import setupBullBoard from "./bullbord.js";
+import {
+  cacheHandler,
+  registerCacheStatsRoute,
+} from "./middlewares/cacheHandler.js";
 
 const PgSession = pgSession(session);
 
@@ -26,7 +32,7 @@ const PgSession = pgSession(session);
     await sequelize.authenticate();
     console.log("PostgreSQL connected");
     // await sequelize.sync({ force: true });
-    await sequelize.sync({ force: false, alter : true });  //backend testing only
+    await sequelize.sync({ force: false, alter: true }); //backend testing only
     const app = express();
 
     app.use(
@@ -38,6 +44,9 @@ const PgSession = pgSession(session);
     app.disable("x-powered-by");
     app.use(express.urlencoded({ extended: true }));
     app.use(express.json());
+
+    app.use(cacheHandler);
+
     app.use(
       session({
         name: SESS_NAME,
@@ -63,7 +72,7 @@ const PgSession = pgSession(session);
     app.use((req, res, next) => {
       console.log(
         `${req.method} ${req.path} — Session:`,
-        req.session?.user || "No session",
+        req.session?.user || "No session"
       );
       next();
     });
@@ -80,12 +89,16 @@ const PgSession = pgSession(session);
     // -->
 
     // <-- REMOVE IN PRODUCTION
-    apiRouter.use("/users",  userRoutes);
-    apiRouter.use("/leave",  leaveRoutes);
-    apiRouter.use("/admin",  adminRoutes);
+    apiRouter.use("/users", userRoutes);
+    apiRouter.use("/leave", leaveRoutes);
+    apiRouter.use("/admin", adminRoutes);
     // -->
 
     setupBullBoard(app);
+
+    if (process.env.NODE_ENV !== "production") {
+      registerCacheStatsRoute(app);
+    }
 
     // Start server (optional - could move to index.js)
     app.listen(PORT, () => console.log(`Listening on port ${PORT}`));

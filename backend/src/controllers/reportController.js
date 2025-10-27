@@ -1,23 +1,16 @@
 import { sequelize } from "../config.js";
-import { Op, QueryTypes } from "sequelize";
-import { parseError } from "./userController.js";
-import ExcelJS from "exceljs";
-import { stringify } from "csv-stringify/sync";
-import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
+import { QueryTypes } from "sequelize";
 import { leaveTypes } from "../validators/leaveValidations.js";
-import { EMAIL_USER } from "../config.js";
-import bree from "../breeInstance.js";
 import path from "path";
 import fs from "fs";
-import { fileURLToPath, pathToFileURL } from "url";
+import { fileURLToPath } from "url";
 import { v4 as uuidv4 } from "uuid"; // npm install uuid
-import { getSummary, getHistory } from "../services/reportService.js";
+import { getHistory } from "../services/reportService.js";
 import {
   User,
   LeaveApproved,
   LeaveRejected,
   LeavePending,
-  CompensatoryLeave,
 } from "../models/index.js";
 import { reportQueue } from "../queues/reportQueue.js"; // BullMQ queue
 

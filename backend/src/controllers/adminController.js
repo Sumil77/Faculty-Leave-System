@@ -4,15 +4,10 @@ import {
   LeaveRejected,
   LeavePending,
   LeaveBalance,
-  LeaveTaken,
   CompensatoryLeave,
 } from "../models/index.js";
 import { parseError } from "./userController.js";
-import { col, fn, literal, Op, QueryTypes } from "sequelize";
-import {
-  leaveSchema,
-  validateLeaveBalance,
-} from "../validators/leaveValidations.js";
+import { Op, QueryTypes } from "sequelize";
 import { sequelize } from "../config.js";
 
 
@@ -284,16 +279,6 @@ export const getUsers = async (req, res) => {
     });
   }
 };
-
-export const getLeaves = async (req, res) => {};
-
-export const getSummary = async (req, res) => {};
-
-export const downloadReport = async (req, res) => {};
-
-export const postUser = async (req, res) => {};
-
-export const mailReport = async (req, res) => {};
 
 export const patchUsers = async (req, res) => {
   const transaction = await sequelize.transaction();

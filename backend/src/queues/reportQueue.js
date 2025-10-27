@@ -9,7 +9,19 @@ const { Queue, Worker, JobScheduler } = bullmq;
 new JobScheduler(queueName, { connection: redis });
 
 // Create the queue
-const reportQueue = new Queue(queueName, { connection: redis });
+const reportQueue = new Queue(queueName, {
+  connection: redis,
+  defaultJobOptions: {
+    attempts: 3, // Retry failed jobs 3 times
+    removeOnComplete: {
+      age: 3600, // Remove completed jobs after 1 hour
+      count: 500, // Or keep only last 500
+    },
+    removeOnFail: {
+      age: 86400, // Remove failed jobs after 24 hours
+    },
+  },
+});
 
 // Worker to process jobs
 const worker = new Worker(
