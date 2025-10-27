@@ -15,8 +15,13 @@ export const routeCacheRules = {
  * Returns TTL (seconds) for a given URL path.
  */
 export const getTTLForUrl = (url) => {
+  console.log(url);
   for (const [route, ttl] of Object.entries(routeCacheRules)) {
-    if (route !== "__default" && url.startsWith(route)) return ttl;
+    if (route !== "__default" && url.startsWith(route)) {
+      console.log("Cache hit:", route, ttl);
+      return ttl;
+    }
   }
+  console.log("Cache miss:", url);
   return routeCacheRules["__default"];
 };

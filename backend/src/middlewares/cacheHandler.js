@@ -42,7 +42,9 @@ export const cacheHandler = async (req, res, next) => {
     const originalJson = res.json.bind(res);
     res.json = async (body) => {
       try {
-        const ttl = getTTLForUrl(req.path);
+        const ttl = getTTLForUrl(req.originalUrl);
+        console.log(ttl);
+        
         await setWithTTL(redis, key, ttl, JSON.stringify(body));
       } catch (err) {
         console.error("❌ Cache set failed:", err.message);
