@@ -23,6 +23,7 @@ import setupBullBoard from "./bullbord.js";
 import {
   cacheHandler,
   registerCacheStatsRoute,
+  cacheRules
 } from "./middlewares/cacheHandler.js";
 
 const PgSession = pgSession(session);
@@ -95,6 +96,9 @@ const PgSession = pgSession(session);
     // -->
 
     setupBullBoard(app);
+
+    // Preload cache rules
+    const rules = await cacheRules();
 
     if (process.env.NODE_ENV !== "production") {
       registerCacheStatsRoute(app);

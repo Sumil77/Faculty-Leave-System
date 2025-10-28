@@ -1,5 +1,6 @@
 // src/middlewares/cacheMiddleware.js
 import redis from "../redis.js";
+import { LeaveRule, LeaveCreditRule, LeaveType } from "../models/index.js";
 import { getTTLForUrl } from "../config/cacheConfig.js";
 
 /**
@@ -44,7 +45,7 @@ export const cacheHandler = async (req, res, next) => {
       try {
         const ttl = getTTLForUrl(req.originalUrl);
         console.log(ttl);
-        
+
         await setWithTTL(redis, key, ttl, JSON.stringify(body));
       } catch (err) {
         console.error("❌ Cache set failed:", err.message);
@@ -79,3 +80,15 @@ export const registerCacheStatsRoute = (app) => {
     }
   });
 };
+
+export async function cacheRules() {
+  const leaveRules = await LeaveRule.findAll({ where: { active: true } });
+  const creditRules = await LeaveCreditRule.findAll({
+    where: { active: true },
+  });
+  const leaveType = await LeaveType.findAll({ where: { active: true } });
+
+  await redis.set("leave_types", JSON.stringify(leaveType));
+  await redis.set("leave_rules", JSON.stringify(leaveRules));
+  await redis.set("credit_rules", JSON.stringify(creditRules));
+}

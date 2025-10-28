@@ -7,6 +7,11 @@ import * as leaveBalanceSeeder from "./20250925190231-demo-leave-balance.js";
 import * as leaveTakenSeeder from "./20250925190236-demo-leave-taken.js";
 import * as credentialsSeeder from "./20250925191610-demo-credentials.js";
 import * as leaveStatusSeeder from "./20250925191845-demo-leave-status.js";
+import * as leaveRuleSeeder from "./2025102802-seed-leave-rules.js";
+import * as leaveCreditRuleSeeder from "./2025102803-seed-leave-credit-rules.js";
+import * as leaveTypeSeeder from "./2025102801-seed-leave-types.js";
+
+// Main seeding function
 
 async function seedAll() {
   try {
@@ -47,6 +52,18 @@ async function seedAll() {
     await runSeederSafely(leaveBalanceSeeder, "LeaveBalance");
     await runSeederSafely(leaveTakenSeeder, "LeaveTaken");
     await leaveStatusSeeder.up(
+      sequelize.getQueryInterface(),
+      sequelize.constructor
+    );
+    await leaveTypeSeeder.up(
+      sequelize.getQueryInterface(),
+      sequelize.constructor
+    );
+    await leaveRuleSeeder.up(
+      sequelize.getQueryInterface(),
+      sequelize.constructor
+    );
+    await leaveCreditRuleSeeder.up(
       sequelize.getQueryInterface(),
       sequelize.constructor
     );

@@ -12,6 +12,9 @@ import ConfirmModal from "../components/ConfirmUserModal";
 import Toast from "../components/Toast";
 import * as adminController from "../util/admin.js";
 
+import { useSelector } from "react-redux";
+
+
 /*the attributes dont match with the fetched data
 Also the Department list needs to be defined statically
 finding the list of dept from the fetched rows is not feasible 
@@ -46,6 +49,7 @@ export default function AdminUsers() {
     setToast({ message, type });
   };
 
+  const dept = useSelector((s) => s.global.departments);
   // Fetch users from API
   // Fetch users from API
   // Fetch users from API
@@ -217,7 +221,7 @@ export default function AdminUsers() {
           onChange={(e) => setFilterDept(e.target.value)}
         >
           <option value="All">All Departments</option>
-          {adminController.dept.map((d) => (
+          {dept.map((d) => (
             <option key={d} value={d}>
               {d}
             </option>

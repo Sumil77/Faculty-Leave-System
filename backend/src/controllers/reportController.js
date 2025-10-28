@@ -1,6 +1,5 @@
 import { sequelize } from "../config.js";
 import { QueryTypes } from "sequelize";
-import { leaveTypes } from "../validators/leaveValidations.js";
 import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
@@ -13,12 +12,6 @@ import {
   LeavePending,
 } from "../models/index.js";
 import { reportQueue } from "../queues/reportQueue.js"; // BullMQ queue
-
-const leaveTypeKeys = Object.keys(leaveTypes); // ['casual', 'medical', ...]
-
-const uniqueAcronyms = [
-  ...new Set(Object.values(leaveTypes).map((type) => type.acronym)),
-];
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

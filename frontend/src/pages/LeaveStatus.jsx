@@ -14,7 +14,7 @@ const LeaveStatus = () => {
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const leaveTypes = leaveController.leaveTypes
+  const leaveTypes = useSelector((state) => state.global.leaveTypes);
 
   const loadLeaves = async () => {
     try {

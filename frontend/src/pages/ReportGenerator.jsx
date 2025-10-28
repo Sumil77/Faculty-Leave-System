@@ -2,7 +2,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { FiDownload, FiMail, FiSearch, FiArrowLeft, FiBarChart2, FiChevronDown } from "react-icons/fi";
 import { useNavigate } from "react-router-dom";
-import { leaveTypes } from "../util/leave.js";
 import { getLeaveHistory, mailReport, getLeaveSummary, mailHistoryReport, requestDownload, waitForJobReady, formatMap, fetchDownloadFile } from "../util/admin.js";
 import SummaryTable from "../components/SummaryTable.jsx";
 import HistoryTable from "../components/HistoryTable.jsx";
@@ -32,6 +31,8 @@ export default function ReportGenerator() {
   const [leaves, setLeaves] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  const leaveTypes = useSelector((state) => state.global.leaveTypes);
 
   const formatDate = (dateString) => {
     const date = new Date(dateString);

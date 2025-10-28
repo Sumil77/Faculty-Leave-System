@@ -12,6 +12,7 @@ import {
 } from "react-icons/fi";
 import * as adminController from "../util/admin"
 import * as leaveController from "../util/leave"
+import { useSelector } from "react-redux";
 
 export default function AdminRequests() {
   const [requests, setRequests] = useState([]);
@@ -37,6 +38,7 @@ export default function AdminRequests() {
   // Instead of building depts dynamically from current page:
   const allDepartments = ["All", "CSE", "ECE", "ME", "CE"]; // or fetch from backend
   const [depts, setDepts] = useState(allDepartments);
+  const leaveTypes = useSelector((s) => s.global.leaveTypes);
 
 
   // Debounce search input
@@ -57,8 +59,8 @@ export default function AdminRequests() {
         status: filters.status !== "All" ? filters.status : undefined,
         dept: filters.dept !== "All" ? filters.dept : undefined,
         leaveType: filters.leaveType || undefined,
-        from: filters.fromDate || undefined, 
-        to: filters.toDate || undefined,     
+        from: filters.fromDate || undefined,
+        to: filters.toDate || undefined,
         appliedFrom: filters.appliedFrom || undefined,
         appliedTo: filters.appliedTo || undefined,
         page,
@@ -304,7 +306,7 @@ export default function AdminRequests() {
                 className="w-full px-3 py-2 border rounded-lg shadow-sm"
               >
                 <option value="All">All Leave Types</option>
-                {Object.entries(leaveController.leaveTypes).map(([key, val]) => (
+                {Object.entries(leaveTypes).map(([key, val]) => (
                   <option key={key} value={key}>
                     {val.acronym} ({key})
                   </option>
@@ -467,7 +469,7 @@ export default function AdminRequests() {
                       </td>
 
                       <td className="px-4 py-4">
-                        {leaveController.leaveTypes[req.leaveType]?.acronym || req.leaveType}
+                        {leaveTypes[req.leaveType]?.acronym || req.leaveType}
                       </td>
 
                       <td className="px-4 py-4">

@@ -5,11 +5,13 @@ import {
   LeavePending,
   LeaveBalance,
   CompensatoryLeave,
+  LeaveType,
+  LeaveBalance_normalized,
 } from "../models/index.js";
 import { parseError } from "./userController.js";
 import { Op, QueryTypes } from "sequelize";
 import { sequelize } from "../config.js";
-
+import redis from "../redis.js"; // centralized redis
 
 export const getRequests = async (req, res) => {
   try {
@@ -215,9 +217,14 @@ export const getUsers = async (req, res) => {
       page = 1,
       limit = 10,
     } = req.query;
-    
-    console.log("Filters received:", { searchTerm, deptFilter, roleFilter, page, limit });
 
+    console.log("Filters received:", {
+      searchTerm,
+      deptFilter,
+      roleFilter,
+      page,
+      limit,
+    });
 
     // Sanitize inputs
     searchTerm = String(searchTerm).trim();
@@ -498,6 +505,127 @@ export const grantCpl = async (req, res) => {
     await transaction.rollback();
     console.log(error);
 
+    return res.status(400).send(parseError(error));
+  }
+};
+
+const CACHE_KEY = "leave_types";
+
+// 🧠 Fetch all leave types
+export const getAllLeaveTypes = async (req, res) => {
+  try {
+    const cached = await redis.get(CACHE_KEY);
+    if (cached) {
+      return res.json(JSON.parse(cached));
+    }
+
+    const leaveTypes = await LeaveType.findAll({ where: { active: true } });
+    await redis.set(CACHE_KEY, JSON.stringify(leaveTypes), "EX", 3600); // redis 1 hour
+    res.json(leaveTypes);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// ➕ Add new leave type
+export const addLeaveType = async (req, res) => {
+  try {
+    const leaveType = await LeaveType.create(req.body);
+    const users = await User.findAll({ attributes: ["user_id"], raw: true });
+    const rows = users.flatMap((u) => ({
+      user_id: u.user_id,
+      leave_type_id: newType.id,
+      balance: newType.defaultBalance || 0,
+    }));
+    await LeaveBalance_normalized.bulkCreate(rows, { ignoreDuplicates: true });
+    await redis.del(CACHE_KEY); // clear redis after changes
+    res.status(201).json(leaveType);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+};
+
+// ✏️ Update leave type
+export const updateLeaveType = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const [updated] = await LeaveType.update(req.body, { where: { id } });
+    if (!updated)
+      return res.status(404).json({ error: "Leave type not found" });
+
+    await redis.del(CACHE_KEY);
+    const updatedType = await LeaveType.findByPk(id);
+    res.json(updatedType);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// ❌ Delete or deactivate
+export const deactivateLeaveType = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const leaveType = await LeaveType.findByPk(id);
+    if (!leaveType)
+      return res.status(404).json({ error: "Leave type not found" });
+
+    leaveType.active = false;
+    await leaveType.save();
+    await redis.del(CACHE_KEY);
+
+    res.json({ message: "Leave type deactivated" });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+
+export const grantCplV2 = async (req, res) => {
+  const transaction = await sequelize.transaction();
+  const grantedBy = req.body.grantedBy;
+  const grants = req.body.grants;
+
+  try {
+    // 1️⃣ Find compensatory leave type
+    const compensatoryType = await LeaveType.findOne({
+      where: { name: "compensatory" },
+      transaction,
+    });
+
+    if (!compensatoryType) {
+      throw new Error("Compensatory leave type not found in LeaveType table");
+    }
+
+    const leaveTypeId = compensatoryType.id;
+
+    // 2️⃣ Process each grant
+    for (const { userId, days, reason } of grants) {
+      const [balance, created] = await LeaveBalance_normalized.findOrCreate({
+        where: { user_id: userId, leave_type_id: leaveTypeId },
+        defaults: { balance: 0 },
+        transaction,
+      });
+
+      const newBalance = balance.balance + days;
+      await balance.update({ balance: newBalance }, { transaction });
+
+      await CompensatoryLeave.create(
+        {
+          user_id: userId,
+          days: days,
+          reason: reason,
+          grantedBy: grantedBy,
+          grantedOn: new Date(),
+        },
+        { transaction }
+      );
+    }
+
+    await transaction.commit();
+    return res.status(200).send("✅ Granted Compensatory Leaves Successfully (v2)");
+  } catch (error) {
+    await transaction.rollback();
+    console.error(error);
     return res.status(400).send(parseError(error));
   }
 };

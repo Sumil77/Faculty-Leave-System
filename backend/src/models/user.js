@@ -1,11 +1,5 @@
 import { DataTypes, Model } from "sequelize";
 import { sequelize } from "../config.js"; // your sequelize instance
-import LeaveApproved from "./leaveApproved.js";
-import LeaveRejected from "./leaveRejected.js";
-import LeavePending from "./leavePending.js";
-import LeaveBalance from "./leaveBalance.js";
-import LeaveTaken from "./leaveTaken.js";
-import CompensatoryLeave from "./CompensatoryLeave.js";
 
 class User extends Model {
   // Static method to check field uniqueness

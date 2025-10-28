@@ -25,7 +25,7 @@ export const getLeaveBalance = async () => {
 export const postLeavePending = async (leave) => {
   return apiRequest("/api/leave/apply", {
     method: "POST",
-    body: leave,
+    body: JSON.stringify(leave),
   });
 };
 

@@ -13,6 +13,10 @@ leaveRouter.get("/getLeave",leaveController.getLeave);
 
 leaveRouter.post("/apply", leaveController.postAppliedLeave);
 
+leaveRouter.post("/v2/apply", leaveController.postAppliedLeaveV2);
+
 leaveRouter.post("/cancelPending", leaveController.postCancelPending);
+
+leaveRouter.get("/v2/balance", leaveController.getLeaveBalanceV2);
 
 export default leaveRouter;

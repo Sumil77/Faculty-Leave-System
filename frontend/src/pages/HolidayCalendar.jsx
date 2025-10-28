@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useSelector } from "react-redux";
 import { Calendar, momentLocalizer } from "react-big-calendar";
 import moment from "moment";
 import "react-big-calendar/lib/css/react-big-calendar.css";
@@ -7,12 +8,8 @@ import "react-big-calendar/lib/css/react-big-calendar.css";
 const localizer = momentLocalizer(moment);
 
 // Define leave types with exact hex color codes
-const leaveTypes = {
-  "Medical Leave": "#3B82F6", // Tailwind bg-blue-500
-  "Casual Leave": "#22C55E", // Tailwind bg-green-500
-  "Child Care Leave": "#EAB308", // Tailwind bg-yellow-500
-  "Earned Leave": "#A855F7" // Tailwind bg-purple-500
-};
+const { leaveTypes } = useSelector((s) => s.global);
+
 
 // Get today's date (without time)
 const today = new Date();

@@ -1,6 +1,7 @@
-import { leaveTypes } from "../util/leave.js";
+import { useSelector } from "react-redux";
 
 export default function SummaryTable({ leaves }) {
+  const { leaveTypes } = useSelector((s) => s.global);
   return (
     <table className="min-w-full bg-white rounded-xl shadow">
       <thead className="bg-gray-200 sticky top-0">

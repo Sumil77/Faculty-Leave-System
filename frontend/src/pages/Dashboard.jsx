@@ -6,9 +6,7 @@ import { FaRegCalendarAlt, FaRegHandPaper, FaHospital, FaUserShield, FaRegClock 
 
 console.log("Dashboard rendered");
 
-const leaveObj = leaveController.leaveTypes;
-
-const leaveTypes = Object(leaveObj)
+import { useSelector } from "react-redux";
 
 // Icons for leave types
 const leaveIcons = {
@@ -55,7 +53,7 @@ const Dashboard = () => {
   const [recentLeaves, setRecentLeaves] = useState([]);
   const [leaveBalances, setLeaveBalance] = useState([]);
   const [sortAsc, setSortAsc] = useState(true);
-
+  const { leaveTypes, departments } = useSelector((s) => s.global);
 
   useEffect(() => {
     const fetchAll = async () => {

@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { login } from "../actions/session.js";
+import { fetchGlobals } from "../store/global.js";
 const departments = ["CSE", "IT", "ECE", "EEE"]; // Updated departments
 
 const generateCaptcha = () => {
@@ -30,6 +31,7 @@ const Login = () => {
     try {
       const data = await dispatch(login(user));
       if (data?.user_id) {
+        await dispatch(fetchGlobals)
         navigate("/dashboard"); // navigate only after successful login
       } else {
         setError("Invalid credentials");

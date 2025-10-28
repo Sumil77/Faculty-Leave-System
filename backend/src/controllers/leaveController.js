@@ -1,16 +1,22 @@
 import {
+  User,
   LeaveApproved,
   LeaveRejected,
   LeavePending,
   LeaveBalance,
   LeaveTaken,
+  LeaveBalance_normalized,
+  LeaveType,
 } from "../models/index.js";
 import { literal, Op } from "sequelize";
 import {
-  leaveSchema,
-  validateLeaveBalance,
+  getLeaveTypes,
+  validateLeaveRequest,
+  validateLeaveRequestV2,
 } from "../validators/leaveValidations.js";
+import { evaluateLeaveRequest } from "../utils/rulesEngine.js";
 import { sequelize } from "../config.js";
+import { parseError } from "../controllers/userController.js"; // adjust path if needed
 
 export const getLeaveApproved = async (req, res) => {
   const user_id = req.session.user.user_id;
@@ -212,6 +218,23 @@ export const getLeaveBalance = async (req, res) => {
   return res.status(200).json(data);
 };
 
+export const getLeaveBalanceV2 = async (req, res) => {
+  const user_id = req.session.user.user_id;
+
+  const balances = await LeaveBalance_normalized.findAll({
+    where: { user_id },
+    include: [{ model: LeaveType, attributes: ["name"] }],
+    raw: true,
+  });
+
+  const formatted = {};
+  balances.forEach((item) => {
+    formatted[item["LeaveType.name"]] = item.balance;
+  });
+
+  return res.status(200).json({ user_id, ...formatted });
+};
+
 export const getLeaveTaken = async (req, res) => {
   const user_id = req.session.user.user_id;
   const data = await LeaveTaken.find({
@@ -265,38 +288,212 @@ export const getRecentLeaves = async (req, res) => {
 };
 
 export const postAppliedLeave = async (req, res) => {
-  const user_id = req.session.user.user_id;
-  const dept = req.session.user.dept;
-  const appliedOn = req.body.time;
-  const fromDate = req.body.from;
-  const toDate = req.body.to;
-  const leaveType = req.body.type;
+  const transaction = await sequelize.transaction();
 
   try {
-    await leaveSchema.validateAsync({
-      appliedOn,
-      fromDate,
-      toDate,
-      leaveType,
+    const user_id = req.session.user.user_id;
+    const dept = req.session.user.dept;
+    const user = await User.findByPk(user_id); // ✅ fetch for rule checks
+
+    const {
+      time: appliedOn,
+      from: fromDate,
+      to: toDate,
+      type: leaveType,
+      reason,
+      attachment,
+      fraction = "full",
+    } = req.body;
+
+    // ✅ Step 1: Validate structure + balance using Redis-powered validator
+    const validated = await validateLeaveRequest(
+      { appliedOn, fromDate, toDate, leaveType, fraction },
+      user_id
+    );
+
+    const isHalfDay = fraction === "half";
+    const isQuarterDay = fraction === "quarter";
+
+    // ✅ Step 2: Fetch leave types dynamically
+    const leaveTypes = await getLeaveTypes();
+    const leaveTypeId = leaveType; // since we're using keys like 'casual', 'medical' etc.
+
+    // ✅ Step 3: Calculate number of requested days
+    let requestedDays =
+      (new Date(toDate) - new Date(fromDate)) / (1000 * 60 * 60 * 24) + 1;
+
+    if (fromDate === toDate) {
+      if (isHalfDay) requestedDays = 0.5;
+      if (isQuarterDay) requestedDays = 0.25;
+    }
+
+    // ✅ Step 4: Validate rules from Redis/DB
+    const ruleCheck = await evaluateLeaveRequest(
+      { ...user.toJSON(), reason, attachment },
+      leaveTypeId,
+      requestedDays,
+      isHalfDay || isQuarterDay, // replace previous "isHalfDay"
+      new Date(appliedOn)
+    );
+
+    if (!ruleCheck.valid) {
+      throw new Error(ruleCheck.reason);
+    }
+
+    // ✅ Step 5: Lock user balance row to prevent race conditions
+    const balance = await LeaveBalance.findOne({
+      where: { user_id },
+      transaction,
+      lock: transaction.LOCK.UPDATE,
     });
-    console.log("ok");
+    if (!balance) throw new Error("Leave balance not found for user.");
 
-    await validateLeaveBalance(user_id, leaveType, fromDate, toDate);
+    // ✅ Step 6: Deduct leave balance
+    const available = balance[leaveType];
+    if (available < requestedDays) {
+      throw new Error(
+        `Insufficient balance. You have ${available} days available for ${leaveTypes[leaveType].fullName}`
+      );
+    }
 
-    const leaveCreated = await LeavePending.create({
-      user_id,
-      appliedOn,
-      fromDate,
-      toDate,
-      leaveType,
-      dept,
+    balance[leaveType] = available - requestedDays;
+    await balance.save({ transaction });
+
+    // ✅ Step 7: Create a new leave request
+    const leaveCreated = await LeavePending.create(
+      {
+        user_id,
+        dept,
+        appliedOn,
+        fromDate,
+        toDate,
+        totalDays: requestedDays,
+        leaveType,
+        reason,
+        attachment,
+        fraction,
+      },
+      { transaction }
+    );
+
+    // ✅ Step 8: Commit transaction
+    await transaction.commit();
+
+    // ✅ Step 9: Return success response
+    return res.status(200).json({
+      message: `Leave applied successfully. ${requestedDays} day(s) deducted from ${leaveTypes[leaveType].fullName}.`,
+      leave: leaveCreated,
     });
-
-    return res.status(200).json(leaveCreated);
   } catch (err) {
-    console.error(err);
+    await transaction.rollback();
+    console.error("Error applying leave:", err);
+    return res.status(400).json({ error: parseError(err) });
+  }
+};
 
-    return res.status(401).send(parseError(err));
+export const postAppliedLeaveV2 = async (req, res) => {
+  const transaction = await sequelize.transaction();
+
+  try {
+    const user_id = req.session.user.user_id;
+    const dept = req.session.user.dept;
+    const user = await User.findByPk(user_id);
+
+    const {
+      time: appliedOn,
+      from: fromDate,
+      to: toDate,
+      type: leaveTypeId, // now passed as ID (from frontend or mapping)
+      reason,
+      attachment,
+      fraction = "full",
+    } = req.body;
+
+    // ✅ 1. Validate structure & balance
+    const validated = await validateLeaveRequestV2(
+      { appliedOn, fromDate, toDate, leaveTypeId, fraction },
+      user_id
+    );
+
+    const isHalfDay = fraction === "half";
+    const isQuarterDay = fraction === "quarter";
+
+    // ✅ 2. Fetch leave type details
+    const leaveType = await LeaveType.findByPk(leaveTypeId);
+    if (!leaveType) throw new Error("Invalid leave type selected.");
+
+    // ✅ 3. Calculate requested days
+    let requestedDays =
+      (new Date(toDate) - new Date(fromDate)) / (1000 * 60 * 60 * 24) + 1;
+
+    if (fromDate === toDate) {
+      if (isHalfDay) requestedDays = 0.5;
+      if (isQuarterDay) requestedDays = 0.25;
+    }
+
+    // ✅ 4. Apply business/rule checks
+    const ruleCheck = await evaluateLeaveRequest(
+      { ...user.toJSON(), reason, attachment },
+      leaveTypeId,
+      requestedDays,
+      isHalfDay || isQuarterDay,
+      new Date(appliedOn)
+    );
+
+    if (!ruleCheck.valid) throw new Error(ruleCheck.reason);
+
+    // ✅ 5. Fetch & lock specific leave balance
+    const balance = await LeaveBalance_normalized.findOne({
+      where: { user_id, leave_type_id: leaveTypeId },
+      transaction,
+      lock: transaction.LOCK.UPDATE,
+    });
+
+    if (!balance)
+      throw new Error(`No leave balance found for ${leaveType.name}`);
+
+    // ✅ 6. Deduct balance safely
+    const available = balance.balance;
+    if (available < requestedDays) {
+      throw new Error(
+        `Insufficient balance. You have ${available} day(s) available for ${leaveType.name}`
+      );
+    }
+
+    await balance.update(
+      { balance: available - requestedDays, last_updated: new Date() },
+      { transaction }
+    );
+
+    // ✅ 7. Create pending leave request entry
+    const leaveCreated = await LeavePending.create(
+      {
+        user_id,
+        dept,
+        appliedOn,
+        fromDate,
+        toDate,
+        totalDays: requestedDays,
+        leaveType: leaveType.name,
+        reason,
+        attachment,
+        fraction,
+      },
+      { transaction }
+    );
+
+    // ✅ 8. Commit transaction
+    await transaction.commit();
+
+    // ✅ 9. Send success response
+    return res.status(200).json({
+      message: `Leave applied successfully. ${requestedDays} day(s) deducted from ${leaveType.name}.`,
+      leave: leaveCreated,
+    });
+  } catch (err) {
+    await transaction.rollback();
+    console.error("Error applying leave (v2):", err);
+    return res.status(400).json({ error: parseError(err) });
   }
 };
 

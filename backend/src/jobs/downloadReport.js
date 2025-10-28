@@ -29,7 +29,7 @@ process.on("message", async (data) => {
     if (type === "summary") {
       if (format === "csv") buffer = await generateCSV(reportData);
       if (format === "excel") buffer = await generateExcel(reportData);
-      if (format === "pdf") buffer = await generatePDF(reportData);
+      if (format === "pdf") buffer = await generatePDF(filters, reportData);
     } else {
       if (format === "csv") buffer = await generateHistoryCSV(reportData);
       if (format === "excel") buffer = await generateHistoryExcel(reportData);

@@ -1,10 +1,8 @@
 import { transporter, sequelize, EMAIL_USER } from "../config.js";
 import ExcelJS from "exceljs";
+import PDFDocument from "pdfkit";
 import { stringify } from "csv-stringify/sync";
-import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
-import { leaveTypes } from "../validators/leaveValidations.js";
-
-const leaveTypeKeys = Object.keys(leaveTypes);
+import { getLeaveTypes } from "../validators/leaveValidations.js";
 
 const formatDate = (iso) => {
   if (!iso) return "";
@@ -17,8 +15,9 @@ const formatDate = (iso) => {
 };
 
 // Utility to safely get cell value
-const safeValue = (row, key) => (row[key] != null ? row[key] : 0);
-
+function safeValue(obj, key) {
+  return obj && obj[key] !== undefined && obj[key] !== null ? obj[key] : "";
+}
 
 export async function getHistory(filters = {}) {
   try {
@@ -250,7 +249,9 @@ export async function generateHistoryPDF(data) {
 
   const colWidths = headers.map((header, i) => {
     const headerWidth = getTextWidth(header);
-    const dataWidth = Math.max(...rows.map((row) => getTextWidth(row[i] ?? "")));
+    const dataWidth = Math.max(
+      ...rows.map((row) => getTextWidth(row[i] ?? ""))
+    );
     return Math.max(headerWidth, dataWidth) + colPadding * 2;
   });
 
@@ -307,7 +308,6 @@ export async function generateHistoryPDF(data) {
   const pdfBytes = await pdfDoc.save();
   return Buffer.from(pdfBytes);
 }
-
 
 export async function getSummary(filters = {}) {
   try {
@@ -376,36 +376,40 @@ export async function getSummaryForMail(filters = {}) {
       orderBy = "user_id",
     } = filters;
 
-    const MAX_ROWS = 500000; // safe cap for mailing
+    const MAX_ROWS = 500000;
+
+    const replacements = {
+      user_id: user_id ?? null,
+      dept: dept ?? null,
+      from_date: from ?? null,
+      to_date: to ?? null,
+      leaveType: leaveType ?? null,
+      orderBy: orderBy ?? "user_id",
+      limit: MAX_ROWS,
+      offset: 0,
+    };
 
     const result = await sequelize.query(
-      `SELECT get_dynamic_leave_summary(
-          :user_id::int,
-          :dept::text,
-          :from_date::date,
-          :to_date::date,
-          :leaveType::text,
-          :orderBy::text,
-          :limit,
-          :offset
-       ) AS data`,
+      `
+      SELECT get_dynamic_leave_summary(
+        :user_id::int,
+        :dept::text,
+        :from_date::date,
+        :to_date::date,
+        :leaveType::text,
+        :orderBy::text,
+        :limit,
+        :offset
+      ) AS data;
+      `,
       {
-        replacements: {
-          user_id,
-          dept,
-          from_date: from,
-          to_date: to,
-          leaveType,
-          orderBy,
-          limit: MAX_ROWS,
-          offset: 0,
-        },
+        replacements,
         type: sequelize.QueryTypes.SELECT,
       }
     );
 
-    if (!result || !result[0] || !result[0].data) {
-      return [];
+    if (!result?.[0]?.data) {
+      return { rows: [], analytics: {} };
     }
 
     const summary =
@@ -413,16 +417,36 @@ export async function getSummaryForMail(filters = {}) {
         ? JSON.parse(result[0].data)
         : result[0].data;
 
-    // ✅ Mailing version only needs rows
-    return summary?.rows || [];
+    // 🩵 Ensure numeric totals
+    if (summary?.rows?.length) {
+      summary.rows = summary.rows.map((row) => ({
+        ...row,
+        totalDays: parseFloat(Number(row.totalDays).toFixed(2)) || 0,
+      }));
+    }
+
+    // 🩵 Return both rows + analytics for PDF
+    return {
+      rows: summary?.rows || [],
+      analytics: summary?.analytics || {},
+      totalCount: summary?.totalCount || 0,
+    };
   } catch (err) {
-    console.error("Error fetching leave summary for mail:", err);
+    console.error("❌ Error fetching leave summary for mail:", err);
     throw new Error("Failed to fetch leave summary for mail.");
   }
 }
 
 export async function generateCSV(data) {
   try {
+    // 🩵 Normalize leave types into a key-value map { acronym: { name, acronym } }
+    const rawLeaveTypes = await getLeaveTypes();
+    const leaveTypes = Array.isArray(rawLeaveTypes)
+      ? Object.fromEntries(rawLeaveTypes.map((t) => [t.acronym, t]))
+      : rawLeaveTypes;
+
+    const leaveTypeKeys = Object.keys(leaveTypes);
+
     data = Array.isArray(data) ? data : data?.rows || [];
     if (!data.length) return Buffer.from("");
 
@@ -453,6 +477,14 @@ export async function generateCSV(data) {
 
 export async function generateExcel(data) {
   try {
+    // 🩵 Normalize leave types into a key-value map { acronym: { name, acronym } }
+    const rawLeaveTypes = await getLeaveTypes();
+    const leaveTypes = Array.isArray(rawLeaveTypes)
+      ? Object.fromEntries(rawLeaveTypes.map((t) => [t.acronym, t]))
+      : rawLeaveTypes;
+
+    const leaveTypeKeys = Object.keys(leaveTypes);
+
     data = Array.isArray(data) ? data : data?.rows || [];
 
     const workbook = new ExcelJS.Workbook();
@@ -479,6 +511,7 @@ export async function generateExcel(data) {
       worksheet.addRow(rowData);
     });
 
+    // Auto width adjustment
     worksheet.columns.forEach((column) => {
       let maxLength = column.header.length;
       column.eachCell({ includeEmpty: true }, (cell) => {
@@ -495,90 +528,180 @@ export async function generateExcel(data) {
   }
 }
 
-export async function generatePDF(data) {
+export async function generatePDF(filters, rawData) {
   try {
-    data = Array.isArray(data) ? data : data?.rows || [];
+    const leaveTypes = await getLeaveTypes();
+    const leaveTypeList = Object.values(leaveTypes);
 
-    const pdfDoc = await PDFDocument.create();
-    const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+    // ✅ Extract both analytics and data
+    const data = Array.isArray(rawData?.rows) ? rawData.rows : rawData || [];
+    const analytics = rawData?.analytics || {};
 
-    const fontSize = 10,
-      margin = 40,
-      rowHeight = 20,
-      colPadding = 5;
-
-    const staticColumns = [
-      { key: "user_id", label: "UID" },
-      { key: "name", label: "Name" },
-      { key: "dept", label: "Dept" },
-    ];
-
-    const leaveColumns = leaveTypeKeys.map((key) => ({
-      key,
-      label: leaveTypes[key].acronym,
-    }));
-
-    const columns = [...staticColumns, ...leaveColumns];
-
-    const getTextWidth = (text) =>
-      font.widthOfTextAtSize(String(text), fontSize);
-
-    const colWidths = columns.map((col) => {
-      const headerWidth = getTextWidth(col.label);
-      const dataWidth = Math.max(
-        ...data.map((row) => getTextWidth(String(safeValue(row, col.key))))
-      );
-      return Math.max(headerWidth, dataWidth) + colPadding * 2;
+    if (!data.length) throw new Error("No data available for PDF generation.");
+    const doc = new PDFDocument({
+      size: "A4",
+      layout: "landscape",
+      margin: 40,
     });
 
-    const totalTableWidth = colWidths.reduce((sum, w) => sum + w, 0);
-    const pageWidth = 595.28; // A4 width in points
-    const tableStartX = Math.max(margin, (pageWidth - totalTableWidth) / 2);
+    const chunks = [];
+    doc.on("data", (chunk) => chunks.push(chunk));
+    const endPromise = new Promise((resolve) =>
+      doc.on("end", () => resolve(Buffer.concat(chunks)))
+    );
 
-    let page = pdfDoc.addPage();
-    let y = page.getHeight() - margin;
+    // ✅ Proper headers using actual data keys
+    const dynamicKeys = Object.keys(data[0]).filter(
+      (k) => !["user_id", "name", "dept", "totalDays"].includes(k)
+    );
+
+    const headers = [
+      { label: "UID", property: "user_id" },
+      { label: "Name", property: "name" },
+      { label: "Dept.", property: "dept" },
+      ...dynamicKeys.map((key) => ({
+        label: leaveTypeList.find((lt) => lt.acronym === key)?.acronym || key,
+        property: key,
+      })),
+    ];
+
+    // ✅ Format rows properly
+    const rows = data.map((row) => {
+      const formatted = {};
+      for (const h of headers) {
+        const val = row[h.property];
+        if (val === null || val === undefined) {
+          formatted[h.property] = "-";
+        } else if (typeof val === "number") {
+          formatted[h.property] =
+            h.property === "user_id"
+              ? parseInt(val).toString()
+              : val % 1 === 0
+              ? val.toString()
+              : val.toFixed(2);
+        } else {
+          formatted[h.property] = String(val);
+        }
+      }
+      return formatted;
+    });
+
+    // 🔠 Font setup
+    const fontSize = 9;
+    const padding = 6;
+    const ctx = doc.font("Helvetica").fontSize(fontSize);
+    const measure = (text) => ctx.widthOfString(String(text || ""));
+
+    const colWidths = headers.map((h) => {
+      const headerWidth = measure(h.label);
+      const dataWidth = Math.max(...rows.map((r) => measure(r[h.property])));
+      return Math.min(Math.max(headerWidth, dataWidth) + padding * 2, 120);
+    });
+
+    const tableWidth = colWidths.reduce((a, b) => a + b, 0);
+    const startX = Math.max(40, (doc.page.width - tableWidth) / 2);
+
+    // 🧾 Title and timestamp
+    doc.font("Helvetica-Bold").fontSize(16).text("Leave Summary Report", {
+      align: "center",
+    });
+    doc
+      .font("Helvetica")
+      .fontSize(10)
+      .text(
+        `Generated on ${new Date().toLocaleString("en-IN", {
+          timeZone: "Asia/Kolkata",
+        })}`,
+        { align: "center" }
+      );
+
+    doc.text(
+      `Filters applied: Dept = ${filters.dept || "All"}, Date Range = ${
+        filters.from || "-"
+      } to ${filters.to || "-"}`
+    );
+
+    // ✅ Add enough space after title
+    let y = doc.y + 30;
 
     const drawRow = (row, isHeader = false) => {
-      let x = tableStartX;
-      columns.forEach((col, i) => {
-        const value = isHeader ? col.label : String(safeValue(row, col.key));
+      let x = startX;
+      const rowHeight = 18;
 
-        page.drawRectangle({
-          x,
-          y: y - rowHeight,
-          width: colWidths[i],
-          height: rowHeight,
-          borderWidth: 0.5,
-          borderColor: rgb(0, 0, 0),
+      doc.font(isHeader ? "Helvetica-Bold" : "Helvetica");
+
+      headers.forEach((h, i) => {
+        const text = row[h.property] || (isHeader ? h.label : "");
+        const width = colWidths[i];
+
+        // Draw border
+        doc.rect(x, y, width, rowHeight).stroke();
+
+        // Clip long names instead of overlapping
+        let displayText = text;
+        if (h.property === "name" && measure(displayText) > width - 8) {
+          while (measure(displayText + "...") > width - 8) {
+            displayText = displayText.slice(0, -1);
+          }
+          displayText += "...";
+        }
+
+        doc.text(displayText, x + 3, y + 5, {
+          width: width - 6,
+          align: "center",
+          lineBreak: false,
         });
 
-        page.drawText(value, {
-          x: x + colPadding,
-          y: y - rowHeight + colPadding,
-          size: fontSize,
-          font,
-        });
-        x += colWidths[i];
+        x += width;
       });
+
+      y += rowHeight;
     };
 
-    drawRow(null, true); // header
-    y -= rowHeight;
+    // Header row
+    drawRow(
+      Object.fromEntries(headers.map((h) => [h.property, h.label])),
+      true
+    );
 
-    for (const row of data) {
-      if (y - rowHeight < margin) {
-        page = pdfDoc.addPage();
-        y = page.getHeight() - margin;
-        drawRow(null, true); // header again
-        y -= rowHeight;
+    // Data rows
+    for (const row of rows) {
+      if (y > doc.page.height - 60) {
+        doc.addPage({ size: "A4", layout: "landscape" });
+        y = 40;
+        drawRow(
+          Object.fromEntries(headers.map((h) => [h.property, h.label])),
+          true
+        );
       }
       drawRow(row);
-      y -= rowHeight;
     }
 
-    return await pdfDoc.save();
+    doc.addPage({ size: "A4", layout: "landscape" });
+    doc
+      .font("Helvetica-Bold")
+      .fontSize(14)
+      .text("Analytics Summary", { align: "center" });
+
+    doc.moveDown(1);
+    Object.entries(analytics.leavetypetotals).forEach(([type, total]) => {
+      doc
+        .font("Helvetica")
+        .fontSize(10)
+        .text(`${type}: ${total}`, { align: "left" });
+    });
+
+    doc.moveDown(1);
+    doc
+      .font("Helvetica-Bold")
+      .text(`Grand Total Leaves Taken: ${analytics.grandtotal}`, {
+        align: "left",
+      });
+
+    doc.end();
+    return await endPromise;
   } catch (err) {
-    console.error("Error generating PDF:", err);
+    console.error("❌ Error generating PDF:", err);
     throw new Error("Failed to generate PDF report.");
   }
 }

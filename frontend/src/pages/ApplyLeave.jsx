@@ -1,200 +1,94 @@
 import { useState, useEffect } from "react";
-import TypeOfLeaveImg from '../assets/Leaves.png';
-import * as leaveController from "../util/leave";
-
+import TypeOfLeaveImg from "../assets/Leaves.png";
+import { useSelector } from "react-redux";
 
 const ApplyLeave = () => {
   const [showForm, setShowForm] = useState(false);
-  const [leaveType, setLeaveType] = useState("");
-  const [leaveDurationFrom, setLeaveDurationFrom] = useState("");
-  const [leaveDurationTo, setLeaveDurationTo] = useState("");
-  const [leaveReason, setLeaveReason] = useState("");
-  const [leaveDuration, setLeaveDuration] = useState("");
-  const [timeFrom, setTimeFrom] = useState("");
-  const [timeTo, setTimeTo] = useState("");
-  const [daysCount, setDaysCount] = useState("");
-  const [leaveHours, setLeaveHours] = useState(0); // Added state for leave hours
-  const [isCancelEnabled, setIsCancelEnabled] = useState(false);
+  const [form, setForm] = useState({
+    leaveType: "",
+    fromDate: "",
+    toDate: "",
+    fraction: "full",
+    reason: "",
+    attachment: null,
+  });
+
+  const [daysCount, setDaysCount] = useState(0);
   const [submittedLeave, setSubmittedLeave] = useState(null);
+  const [isCancelEnabled, setIsCancelEnabled] = useState(false);
+  const leaveTypes = useSelector((state) => state.global.leaveTypes);
 
-  const leaveTypes = leaveController.leaveTypes;
-
-  const generateTimeOptions = () => {
-    const times = [];
-    let hour = 8;
-    let minute = 0;
-
-    while (hour < 17 || (hour === 16 && minute <= 30)) {
-      const value = `${hour.toString().padStart(2, "0")}:${minute.toString().padStart(2, "0")}`;
-      let displayHour = hour > 12 ? hour - 12 : hour;
-      const suffix = hour < 12 ? "AM" : "PM";
-      if (displayHour === 0) displayHour = 12;
-
-      const label = `${displayHour}:${minute.toString().padStart(2, "0")} ${suffix}`;
-      times.push({ value, label });
-
-      minute += 30;
-      if (minute >= 60) {
-        hour += 1;
-        minute = 0;
-      }
-    }
-
-    return times;
-  };
-
-
-  const getTodayDateLocal = () => {
-    const today = new Date();
-    today.setMinutes(today.getMinutes() - today.getTimezoneOffset());
-    return today.toISOString().split("T")[0];
-  };
-
-  // Function to calculate total leave days (for Full Day leave only)
-  const calculateLeaveDays = () => {
-    if (leaveDuration === "Full Day") {
-      if (leaveDurationFrom && leaveDurationTo) {
-        const from = new Date(leaveDurationFrom);
-        const to = new Date(leaveDurationTo);
-        if (from > to) {
-          setDaysCount(0);
-          return;
-        }
-        const diffInTime = to.getTime() - from.getTime();
-        const days = Math.floor(diffInTime / (1000 * 3600 * 24)) + 1;
-        setDaysCount(days);
-      } else {
-        setDaysCount(0);
-      }
-    }
-  };
-
+  // Calculate total leave days for full-day leaves
   useEffect(() => {
-    calculateLeaveDays();
-  }, [leaveDurationFrom, leaveDurationTo, leaveDuration]);
+    if (form.fromDate && form.toDate && form.fraction === "full") {
+      const from = new Date(form.fromDate);
+      const to = new Date(form.toDate);
+      if (from > to) {
+        setDaysCount(0);
+        return;
+      }
+      const diff = (to - from) / (1000 * 60 * 60 * 24) + 1;
+      setDaysCount(diff);
+    } else {
+      setDaysCount(0);
+    }
+  }, [form.fromDate, form.toDate, form.fraction]);
 
-  // Helper function to correct time within range (08:00 AM to 04:30 PM)
-  const correctTimeWithinRange = (time) => {
-    const [hours, minutes] = time.split(":").map(Number);
-    const totalMinutes = hours * 60 + minutes;
-
-    const minMinutes = 8 * 60;        // 08:00 AM
-    const maxMinutes = 16 * 60 + 30;  // 04:30 PM
-
-    if (totalMinutes < minMinutes) return "08:00";
-    if (totalMinutes > maxMinutes) return "16:30";
-    return time;
+  // Handle form input changes
+  const handleChange = (e) => {
+    const { name, value, files } = e.target;
+    if (files) {
+      setForm({ ...form, [name]: files[0] });
+    } else {
+      setForm({ ...form, [name]: value });
+    }
   };
 
-  // Handle submit logic
+  // Submit leave
   const handleSubmit = async (e) => {
     e.preventDefault();
+    const { leaveType, fromDate, toDate, reason, fraction } = form;
 
-    if (new Date(leaveDurationFrom) > new Date(leaveDurationTo)) {
-      alert("The 'From' date must be earlier than or equal to the 'To' date.");
+    if (!leaveType || !fromDate || !toDate || !reason) {
+      alert("Please fill all mandatory fields!");
       return;
     }
 
-    if (!leaveType || !leaveDurationFrom || !leaveDurationTo || !leaveReason || !leaveDuration) {
-      alert("Please fill in all fields!");
+    if (new Date(fromDate) > new Date(toDate)) {
+      alert("From date cannot be after To date!");
       return;
     }
 
-    // Time validation (for Half/Quarter Day)
-    if (leaveDuration === "Half Day" || leaveDuration === "Quarter Day") {
-      if (!timeFrom || !timeTo) {
-        alert("Please enter both start and end time.");
-        return;
-      }
+    try {
+      const leave = {
+        time: new Date().toISOString(),
+        from: fromDate,
+        to: toDate,
+        type: leaveType,
+        reason,
+        fraction,
+        attachment: form.attachment,
+      };
 
-      const [fromH, fromM] = timeFrom.split(":").map(Number);
-      const [toH, toM] = timeTo.split(":").map(Number);
+      await leaveController.postLeavePending(leave);
 
-      const totalFrom = fromH * 60 + fromM;
-      const totalTo = toH * 60 + toM;
+      setSubmittedLeave({
+        ...leave,
+        totalDays: fraction === "full" ? daysCount : fraction === "half" ? 0.5 : 0.25,
+      });
 
-      // Validate within working hours: 8:00 AM (480 min) to 4:30 PM (990 min)
-      const collegeStart = 8 * 60;
-      const collegeEnd = 16 * 60 + 30;
 
-      if (totalFrom < collegeStart || totalTo > collegeEnd) {
-        alert("Please select time between 08:00 AM and 04:30 PM.");
-        return;
-      }
-
-      if (totalFrom >= totalTo) {
-        alert("Start time must be before end time.");
-        return;
-      }
-
-      const diffMin = totalTo - totalFrom;
-      const hours = diffMin / 60;
-      setLeaveHours(hours); // Set the calculated leave hours
-
-      // Enforce leave type match with hours
-      if (hours <= 1.875 && leaveDuration !== "Quarter Day") {
-        alert("Timing indicates Quarter Day. Please change the leave type.");
-        return;
-      } else if (hours > 1.875 && hours <= 4.25 && leaveDuration !== "Half Day") {
-        alert("Timing indicates Half Day. Please change the leave type.");
-        return;
-      } else if (hours > 4.25 && leaveDuration !== "Full Day") {
-        alert("Timing exceeds Half Day. Please select Full Day leave.");
-        return;
-      }
-
+      setShowForm(false);
+      setIsCancelEnabled(true);
+      setTimeout(() => setIsCancelEnabled(false), 15 * 60 * 1000);
+      setForm({ leaveType: "", fromDate: "", toDate: "", fraction: "full", reason: "", attachment: null });
+    } catch (err) {
+      console.error(err);
+      alert("Error applying leave. Please try again.");
     }
-
-    // Calculate leave days taken
-    let totalLeaveTaken = 0;
-    if (leaveDuration === "Full Day") {
-      totalLeaveTaken = daysCount;
-    } else if (leaveDuration === "Half Day") {
-      totalLeaveTaken = 0.5;
-    } else if (leaveDuration === "Quarter Day") {
-      totalLeaveTaken = 0.25;
-    }
-
-    // Set submission data
-    setSubmittedLeave({
-      type: leaveType,
-      from: leaveDurationFrom,
-      to: leaveDurationTo,
-      duration: leaveDuration,
-      reason: leaveReason,
-      totalDays: totalLeaveTaken,
-      leaveHours: leaveHours, // Include calculated leave hours
-    });
-
-    const today = (new Date()).toISOString();
-    const leave = {
-      time: today,
-      from: leaveDurationFrom,
-      to: leaveDurationTo,
-      type: leaveType
-    };
-
-
-    await leaveController.postLeavePending(leave)
-
-    setIsCancelEnabled(true);
-    setTimeout(() => setIsCancelEnabled(false), 15 * 60 * 1000);
-
-    // Reset form
-    setLeaveType("");
-    setLeaveDurationFrom("");
-    setLeaveDurationTo("");
-    setLeaveReason("");
-    setLeaveDuration("");
-    setTimeFrom("");
-    setTimeTo("");
-    setShowForm(false);
-    setDaysCount("");
-    setLeaveHours(0); // Reset leave hours
   };
 
-  // Handle cancel logic
-  const handleCancelLeave = () => {
+  const handleCancel = () => {
     setSubmittedLeave(null);
     setIsCancelEnabled(false);
   };
@@ -205,175 +99,154 @@ const ApplyLeave = () => {
         Leave Management System
       </h2>
 
-      <div className="flex gap-6 justify-center mb-10">
+      <div className="flex justify-center gap-6 mb-10">
         <button
-          className="bg-blue-500 text-white px-6 py-3 rounded-full shadow-lg hover:bg-blue-600 hover:shadow-xl transition-all"
+          className="bg-blue-600 text-white px-6 py-3 rounded-lg shadow hover:bg-blue-700"
           onClick={() => setShowForm(true)}
         >
           Apply Leave
         </button>
         <button
-          className={`px-6 py-3 rounded-full shadow-lg ${isCancelEnabled
-            ? "bg-red-500 text-white hover:bg-red-600 hover:shadow-xl transition-all"
-            : "bg-gray-400 text-gray-700 cursor-not-allowed"
-            }`}
-          onClick={handleCancelLeave}
           disabled={!isCancelEnabled}
+          onClick={handleCancel}
+          className={`px-6 py-3 rounded-lg shadow ${isCancelEnabled
+            ? "bg-red-500 text-white hover:bg-red-600"
+            : "bg-gray-300 text-gray-700 cursor-not-allowed"
+            }`}
         >
           Cancel Leave
         </button>
       </div>
+
       {!showForm && !submittedLeave && (
         <div className="flex justify-center mt-6">
           <img
             src={TypeOfLeaveImg}
-            alt="Types of Leave"
-            className="max-w-full md:max-w-2xl h-auto rounded-xl shadow-lg"
+            alt="Leave Info"
+            className="max-w-xl w-full rounded-xl shadow"
           />
         </div>
       )}
 
-
-
-
-
       {showForm && (
         <form
           onSubmit={handleSubmit}
-          className="bg-white p-8 rounded-2xl shadow-xl max-w-xl mx-auto space-y-6 border-t-8 border-blue-500"
+          className="bg-white p-8 rounded-xl shadow-md max-w-lg mx-auto space-y-6 border-t-8 border-blue-600"
         >
           {/* Leave Type */}
           <div>
-            <label className="block mb-2 text-lg font-semibold text-blue-800">Type of Leave:</label>
+            <label className="block mb-2 font-semibold text-blue-800">
+              Leave Type
+            </label>
             <select
-              value={leaveType}
-              onChange={(e) => setLeaveType(e.target.value)}
+              name="leaveType"
+              value={form.leaveType}
+              onChange={handleChange}
               className="border rounded-lg p-3 w-full"
             >
               <option value="">Select Leave Type</option>
-              {Object.entries(leaveTypes).map(([key, type], idx) => (
-                <option key={idx} value={key}>
-                  {type.fullName}
+              {Object.entries(leaveTypes).map(([key, val]) => (
+                <option key={key} value={key}>
+                  {val.fullName}
                 </option>
               ))}
             </select>
           </div>
 
-          {/* Leave Duration Type */}
+          {/* Fraction */}
           <div>
-            <label className="block mb-2 text-lg font-semibold text-blue-800">Duration:</label>
+            <label className="block mb-2 font-semibold text-blue-800">
+              Duration
+            </label>
             <select
-              value={leaveDuration}
-              onChange={(e) => setLeaveDuration(e.target.value)}
+              name="fraction"
+              value={form.fraction}
+              onChange={handleChange}
               className="border rounded-lg p-3 w-full"
             >
-              <option value="">Select Leave Duration</option>
-              <option value="Full Day">Full Day</option>
-              <option value="Half Day">Half Day</option>
-              <option value="Quarter Day">Quarter Day</option>
+              <option value="full">Full Day</option>
+              <option value="half">Half Day</option>
+              <option value="quarter">Quarter Day</option>
             </select>
           </div>
 
-          {/* From Date */}
+          {/* Dates */}
           <div>
-            <label className="block mb-2 text-lg font-semibold text-blue-800">Duration (From):</label>
+            <label className="block mb-2 font-semibold text-blue-800">
+              From Date
+            </label>
             <input
               type="date"
-              value={leaveDurationFrom}
-              min={new Date().toLocaleDateString('en-CA')}
-              onChange={(e) => {
-                const selectedDate = e.target.value;
-                setLeaveDurationFrom(selectedDate);
-
-                if (leaveDuration === "Half Day" || leaveDuration === "Quarter Day") {
-                  setLeaveDurationTo(selectedDate);
-                } else {
-                  setLeaveDurationTo("");
-                }
-
-                calculateLeaveDays();
-              }}
+              name="fromDate"
+              value={form.fromDate}
+              min={new Date().toLocaleDateString("en-CA")}
+              onChange={handleChange}
               className="border rounded-lg p-3 w-full"
             />
           </div>
 
-          {/* To Date */}
           <div>
-            <label className="block mb-2 text-lg font-semibold text-blue-800">Duration (To):</label>
+            <label className="block mb-2 font-semibold text-blue-800">
+              To Date
+            </label>
             <input
               type="date"
-              value={leaveDurationTo}
-              min={leaveDurationFrom || new Date().toLocaleDateString('en-CA')}
-              onChange={(e) => {
-                setLeaveDurationTo(e.target.value);
-                calculateLeaveDays();
-              }}
+              name="toDate"
+              value={form.toDate}
+              min={form.fromDate || new Date().toLocaleDateString("en-CA")}
+              onChange={handleChange}
               className="border rounded-lg p-3 w-full"
-              disabled={leaveDuration === "Half Day" || leaveDuration === "Quarter Day"}
+              disabled={form.fraction !== "full"}
             />
           </div>
 
-          {/* Read-only Days Count */}
-          {daysCount && leaveDuration === "Full Day" && (
+          {/* Days count (Full day only) */}
+          {form.fraction === "full" && daysCount > 0 && (
             <div>
-              <label className="block mb-2 text-lg font-semibold text-blue-800">Total Days:</label>
+              <label className="block mb-2 font-semibold text-blue-800">
+                Total Days
+              </label>
               <input
                 type="text"
-                value={daysCount}
                 readOnly
+                value={daysCount}
                 className="border rounded-lg p-3 w-full bg-gray-100"
               />
             </div>
           )}
 
-          {/* Time Fields for Half or Quarter Day */}
-          {(leaveDuration === "Half Day" || leaveDuration === "Quarter Day") && (
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block mb-2 text-lg font-semibold text-blue-800">Time From:</label>
-                <select
-                  value={timeFrom}
-                  onChange={(e) => setTimeFrom(e.target.value)}
-                  className="border rounded-lg p-3 w-full"
-                >
-                  <option value="">Select Time From</option>
-                  {generateTimeOptions().map((time, idx) => (
-                    <option key={idx} value={time.value}>{time.label}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block mb-2 text-lg font-semibold text-blue-800">Time To:</label>
-                <select
-                  value={timeTo}
-                  onChange={(e) => setTimeTo(e.target.value)}
-                  className="border rounded-lg p-3 w-full"
-                >
-                  <option value="">Select Time To</option>
-                  {generateTimeOptions().map((time, idx) => (
-                    <option key={idx} value={time.value}>{time.label}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-          )}
-
-
-          {/* Reason for Leave */}
+          {/* Reason */}
           <div>
-            <label className="block mb-2 text-lg font-semibold text-blue-800">Reason:</label>
+            <label className="block mb-2 font-semibold text-blue-800">
+              Reason
+            </label>
             <textarea
-              value={leaveReason}
-              onChange={(e) => setLeaveReason(e.target.value)}
+              name="reason"
+              value={form.reason}
+              onChange={handleChange}
+              rows={3}
               className="border rounded-lg p-3 w-full"
-              rows="3"
+            />
+          </div>
+
+          {/* File attachment (optional) */}
+          <div>
+            <label className="block mb-2 font-semibold text-blue-800">
+              Attachment (optional)
+            </label>
+            <input
+              type="file"
+              name="attachment"
+              accept="image/*,.pdf"
+              onChange={handleChange}
+              className="border rounded-lg p-3 w-full"
             />
           </div>
 
           <div className="flex justify-center">
             <button
               type="submit"
-              className="bg-blue-500 text-white px-6 py-3 rounded-full shadow-lg hover:bg-blue-600 hover:shadow-xl transition-all"
+              className="bg-blue-600 text-white px-6 py-3 rounded-lg shadow hover:bg-blue-700"
             >
               Submit Leave
             </button>
@@ -381,56 +254,17 @@ const ApplyLeave = () => {
         </form>
       )}
 
-      {/* Display Submitted Leave Info */}
       {submittedLeave && (
-        <div className="mt-8 bg-white p-6 rounded-2xl shadow-xl space-y-6 max-w-lg mx-auto">
-          <h3 className="text-2xl font-bold text-blue-800 flex items-center gap-2">
-            <span>✅</span> <span>Submitted Leave:</span>
-          </h3>
-          <div className="space-y-2">
-            <p className="text-lg font-medium">
-              <span role="img" aria-label="Leave Type" className="mr-2">🌴</span>
-              Leave Type: <strong>{submittedLeave.type}</strong>
-            </p>
-            <p className="text-lg font-medium">
-              <span role="img" aria-label="Leave Duration" className="mr-2">⏳</span>
-              Leave Duration: <strong>{submittedLeave.duration}</strong>
-            </p>
-            <p className="text-lg font-medium">
-              <span role="img" aria-label="Reason" className="mr-2">📝</span>
-              Leave Reason: <strong>{submittedLeave.reason}</strong>
-            </p>
-            <p className="text-lg font-medium">
-              <span role="img" aria-label="From" className="mr-2">📅</span>
-              From: <strong>{submittedLeave.from}</strong>
-            </p>
-            <p className="text-lg font-medium">
-              <span role="img" aria-label="To" className="mr-2">📅</span>
-              To: <strong>{submittedLeave.to}</strong>
-            </p>
-            {/* Conditionally render Time only if it's NOT Full Day */}
-            {submittedLeave.duration !== "Full Day" && (
-              <>
-                <p className="text-lg font-medium">
-                  <span role="img" aria-label="Leave Time" className="mr-2">⏰</span>
-                  Leave Time: <strong>{`${timeFrom} - ${timeTo}`}</strong>
-                </p>
-              </>
-            )}
-            <p className="text-lg font-medium">
-              <span role="img" aria-label="Total Leave" className="mr-2">📊</span>
-              Total Leave: <strong>{submittedLeave.totalDays} day(s)</strong>
-            </p>
-          </div>
-
-          {/* Fun Emoji */}
-          <div className="flex justify-center">
-            <span role="img" aria-label="Happy" className="text-4xl">🎉</span>
-          </div>
+        <div className="mt-8 bg-white p-6 rounded-xl shadow-md max-w-lg mx-auto space-y-3">
+          <h3 className="text-xl font-bold text-blue-800">Leave Submitted ✅</h3>
+          <p><strong>Type:</strong> {submittedLeave.type}</p>
+          <p><strong>Duration:</strong> {submittedLeave.fraction}</p>
+          <p><strong>Reason:</strong> {submittedLeave.reason}</p>
+          <p><strong>From:</strong> {submittedLeave.from}</p>
+          <p><strong>To:</strong> {submittedLeave.to}</p>
+          <p><strong>Total:</strong> {submittedLeave.totalDays} day(s)</p>
         </div>
       )}
-
-
     </div>
   );
 };

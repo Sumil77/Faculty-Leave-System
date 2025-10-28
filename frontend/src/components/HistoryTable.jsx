@@ -1,4 +1,5 @@
-import { leaveTypes } from "../util/leave.js";
+import { useSelector } from "react-redux";
+
 
 const formatDate = (dateString) => {
   if (!dateString) return "-";
@@ -11,6 +12,8 @@ const formatDate = (dateString) => {
 };
 
 export default function HistoryTable({ leaves = [] }) {
+  const leaveTypes = useSelector((state) => state.global.leaveTypes);
+
   return (
     <table className="min-w-full bg-white rounded-xl shadow overflow-hidden">
       <thead className="bg-gray-200 sticky top-0 z-10">
