@@ -12,7 +12,8 @@ import AdminRequests from "../pages/AdminRequests";
 import AdminUsers from "../pages/AdminUsers";
 import AdminReports from "../pages/AdminReports";
 import ReportGenerator from "../pages/ReportGenerator";
-
+import AdminLeaves from "../pages/AdminLeaves";
+import AdminDepartments from "../pages/AdminDepartments";
 
 const AppRoutes = () => {
   return (
@@ -25,6 +26,8 @@ const AppRoutes = () => {
         <Route path="/admin-panel/requests" element={<AdminRequests />} />
         <Route path="/admin-panel/users" element={<AdminUsers />} />
         <Route path="/admin-panel/reports" element={<AdminReports />} />
+        <Route path="/admin-panel/leaves" element={<AdminLeaves />} />
+        <Route path="/admin-panel/departments" element={<AdminDepartments />} />
         <Route path="/admin/reports/generator" element={<ReportGenerator />} />
       </Route>
 

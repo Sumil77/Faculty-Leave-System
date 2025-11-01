@@ -1,13 +1,61 @@
 // src/middlewares/cacheMiddleware.js
 import redis from "../redis.js";
 import { LeaveRule, LeaveCreditRule, LeaveType } from "../models/index.js";
-import { getTTLForUrl } from "../config/cacheConfig.js";
+import { getTTLForUrl, CACHE_KEYS } from "../config/cacheConfig.js";
 
 /**
  * Central cache middleware.
  * Works for GET requests only.
  * Adds X-Cache header to indicate HIT or MISS.
  */
+
+export const setCache = async (key, value, ttl = 3600) => {
+  const str = JSON.stringify(value);
+  if (typeof redis.setEx === "function") {
+    await redis.setEx(key, ttl, str);
+    return;
+  }
+  if (typeof redis.setex === "function") {
+    await redis.setex(key, ttl, str);
+    return;
+  }
+  await redis.set(key, str, "EX", ttl);
+};
+
+export const delCache = async (...keys) => {
+  try {
+    if (!keys.length) return;
+    if (typeof redis.del === "function") await redis.del(...keys);
+    else {
+      for (const k of keys) await redis.del(k);
+    }
+  } catch (err) {
+    console.error("delCache error:", err.message);
+  }
+};
+
+/**
+ * Rebuild the canonical caches used by the app.
+ * This is called after add/update/delete operations to keep redis in sync.
+ */
+export const rebuildLeaveCaches = async (ttlSeconds = 3600) => {
+  try {
+    const [leaveTypes, leaveRules, creditRules] = await Promise.all([
+      LeaveType.findAll({ where: { active: true }, raw: true }),
+      LeaveRule.findAll({ where: { active: true }, raw: true }),
+      LeaveCreditRule.findAll({ where: { active: true }, raw: true }),
+    ]);
+
+    await Promise.all([
+      setCache(CACHE_KEYS.LEAVE_TYPES, leaveTypes, ttlSeconds),
+      setCache(CACHE_KEYS.LEAVE_RULES, leaveRules, ttlSeconds),
+      setCache(CACHE_KEYS.CREDIT_RULES, creditRules, ttlSeconds),
+    ]);
+  } catch (err) {
+    console.error("rebuildLeaveCaches error:", err.message);
+  }
+};
+
 
 async function setWithTTL(redis, key, ttlSeconds, value) {
   // node-redis v4: setEx
@@ -81,6 +129,7 @@ export const registerCacheStatsRoute = (app) => {
   });
 };
 
+
 export async function cacheRules() {
   const leaveRules = await LeaveRule.findAll({ where: { active: true } });
   const creditRules = await LeaveCreditRule.findAll({
@@ -88,7 +137,7 @@ export async function cacheRules() {
   });
   const leaveType = await LeaveType.findAll({ where: { active: true } });
 
-  await redis.set("leave_types", JSON.stringify(leaveType));
-  await redis.set("leave_rules", JSON.stringify(leaveRules));
-  await redis.set("credit_rules", JSON.stringify(creditRules));
+  await setCache(CACHE_KEYS.LEAVE_TYPES, leaveType);
+  await setCache(CACHE_KEYS.LEAVE_RULES, leaveRules);
+  await setCache(CACHE_KEYS.CREDIT_RULES, creditRules);
 }

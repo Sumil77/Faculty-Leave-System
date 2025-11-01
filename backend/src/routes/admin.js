@@ -39,10 +39,23 @@ adminRouter.get("/download-history", reportController.downloadHistory);
 adminRouter.post("/send-mail", reportController.sendMail);
 adminRouter.post("/send-history-mail", reportController.sendHistoryMail);
 
-// Leave Type Management
+// Leave types
 adminRouter.get("/leave-types", adminController.getAllLeaveTypes);
+adminRouter.get("/leave-types/:id", adminController.getLeaveTypeById);
 adminRouter.post("/leave-types", adminController.addLeaveType);
 adminRouter.put("/leave-types/:id", adminController.updateLeaveType);
-adminRouter.delete("/leave-types/:id", adminController.deactivateLeaveType);
+adminRouter.patch("/leave-types/:id/deactivate", adminController.deactivateLeaveType);
+
+// Leave rules
+adminRouter.get("/leave-rules", adminController.getLeaveRules);
+adminRouter.post("/leave-rules", adminController.addLeaveRule);
+adminRouter.put("/leave-rules/:id", adminController.updateLeaveRule);
+adminRouter.delete("/leave-rules/:id", adminController.deleteLeaveRule);
+
+// Credit rules
+adminRouter.get("/credit-rules", adminController.getCreditRules);
+adminRouter.post("/credit-rules", adminController.addCreditRule);
+adminRouter.put("/credit-rules/:id", adminController.updateCreditRule);
+adminRouter.delete("/credit-rules/:id", adminController.deleteCreditRule);
 
 export default adminRouter;

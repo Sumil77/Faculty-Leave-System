@@ -17,6 +17,79 @@ export const defaultLeaveTypes = {
   withoutPay: { fullName: "Without Pay", acronym: "WPL" },
 };
 
+/* ----------------------
+   Validation schemas
+   ---------------------- */
+export const leaveTypeSchema = Joi.object({
+  name: Joi.string().max(255).required(),
+  acronym: Joi.string().max(20).required(),
+  description: Joi.string().allow("", null),
+  defaultBalance: Joi.number().integer().min(0).optional(),
+  maxDaysPerMonth: Joi.number().integer().min(0).optional(),
+  maxDaysPerYear: Joi.number().integer().min(0).optional(),
+  carryForward: Joi.boolean().optional(),
+  requiresDocument: Joi.boolean().optional(),
+  isPaid: Joi.boolean().optional(),
+  genderSpecific: Joi.string().valid("M", "F", "ANY", null).optional(),
+  minGapBetweenLeaves: Joi.number().integer().optional(),
+  maxConsecutiveDays: Joi.number().integer().optional(),
+  noticePeriodRequired: Joi.number().integer().optional(),
+  active: Joi.boolean().optional(),
+});
+
+export const leaveRuleSchema = Joi.object({
+  leave_type_id: Joi.number().integer().required(),
+  max_days_per_request: Joi.number().integer().optional(),
+  min_days_per_request: Joi.number().integer().optional(),
+  max_days_per_year: Joi.number().integer().optional(),
+  max_days_per_month: Joi.number().integer().optional(),
+  allow_half_day: Joi.boolean().optional(),
+  allow_quarter_day: Joi.boolean().optional(),
+  max_consecutive_days: Joi.number().integer().optional(),
+  min_gap_between_leaves: Joi.number().integer().optional(),
+  require_prior_approval: Joi.boolean().optional(),
+  apply_before_days: Joi.number().integer().optional(),
+  gender_applicable: Joi.string().optional(),
+  probation_allowed: Joi.boolean().optional(),
+  min_service_months: Joi.number().integer().optional(),
+  holiday_included: Joi.boolean().optional(),
+  weekend_included: Joi.boolean().optional(),
+  can_be_combined_with: Joi.array().items(Joi.string()).optional(),
+  restricted_to_designation: Joi.array().items(Joi.string()).optional(),
+  restricted_to_department: Joi.array().items(Joi.string()).optional(),
+  restricted_to_location: Joi.array().items(Joi.string()).optional(),
+  reason_required: Joi.boolean().optional(),
+  attachment_required: Joi.boolean().optional(),
+  approval_chain: Joi.array().items(Joi.string()).optional(),
+  auto_approve_if_pending_days: Joi.number().integer().optional(),
+  encashable: Joi.boolean().optional(),
+  active: Joi.boolean().optional(),
+});
+
+export const creditRuleSchema = Joi.object({
+  leave_type_id: Joi.number().integer().required(),
+  credit_frequency: Joi.string().valid("monthly", "quarterly", "yearly", "dateOfJoining").required(),
+  credit_day: Joi.number().integer().optional(),
+  credit_amount: Joi.number().precision(2).required(),
+  prorate_on_joining: Joi.boolean().optional(),
+  probation_excluded: Joi.boolean().optional(),
+  department_id: Joi.number().integer().optional(),
+  designation_id: Joi.number().integer().optional(),
+  carry_forward: Joi.boolean().optional(),
+  carry_forward_limit: Joi.number().precision(2).optional(),
+  lapse_after_days: Joi.number().integer().optional(),
+  max_balance: Joi.number().precision(2).optional(),
+  bonus_credit_on_occasion: Joi.object().optional(),
+  penalty_rule: Joi.object().optional(),
+  auto_reset: Joi.boolean().optional(),
+  leave_encashment_allowed: Joi.boolean().optional(),
+  encashment_conversion_rate: Joi.number().precision(2).optional(),
+  min_balance_for_encashment: Joi.number().precision(2).optional(),
+  credit_on_anniversary: Joi.boolean().optional(),
+  remarks: Joi.string().optional(),
+  active: Joi.boolean().optional(),
+});
+
 
 // Fetch leave types dynamically
 export const getLeaveTypes = async () => {

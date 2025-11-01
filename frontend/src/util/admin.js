@@ -200,3 +200,165 @@ export const mailHistoryReport = async (filters = {}) => {
     body: JSON.stringify(filters),
   });
 };
+
+
+// ---------------------
+// Leave Type Management
+// ---------------------
+
+/**
+ * Get all active leave types (cached in Redis for 1 hour)
+ */
+export const getLeaveTypes = async () => {
+  return apiRequest("/api/admin/leave-types", { method: "GET" });
+};
+
+/**
+ * Add a new leave type
+ * @param {Object} leaveType - e.g. { name: "Casual Leave", defaultBalance: 12 }
+ */
+export const addLeaveType = async (leaveType) => {
+  if (!leaveType || !leaveType.name) throw new Error("Invalid leave type data");
+  return apiRequest("/api/admin/leave-types", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(leaveType),
+  });
+};
+
+/**
+ * Update an existing leave type
+ * @param {number|string} id - leave type ID
+ * @param {Object} data - updated fields, e.g. { name: "Updated Name", defaultBalance: 15 }
+ */
+export const updateLeaveType = async (id, data) => {
+  if (!id) throw new Error("Leave type ID required");
+  return apiRequest(`/api/admin/leave-types/${id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+};
+
+/**
+ * Deactivate (soft delete) a leave type
+ * @param {number|string} id - leave type ID
+ */
+export const deactivateLeaveType = async (id) => {
+  if (!id) throw new Error("Leave type ID required");
+  return apiRequest(`/api/admin/leave-types/${id}`, {
+    method: "DELETE",
+  });
+};
+
+
+// ---------------------
+// Leave Rules Management
+// ---------------------
+
+/**
+ * Get all leave rules for all types
+ * Optionally filtered by leaveTypeId
+ */
+export const getLeaveRules = async (leaveTypeId = null) => {
+  const url = leaveTypeId
+    ? `/api/admin/leave-rules?leaveTypeId=${leaveTypeId}`
+    : `/api/admin/leave-rules`;
+  return apiRequest(url, { method: "GET" });
+};
+
+/**
+ * Add a new leave rule
+ * @param {Object} rule - e.g. { leaveTypeId, minGap, maxConsecutive, carryForward, genderRestriction }
+ */
+export const addLeaveRule = async (rule) => {
+  if (!rule || !rule.leaveTypeId)
+    throw new Error("Leave rule data or leaveTypeId missing");
+  return apiRequest("/api/admin/leave-rules", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(rule),
+  });
+};
+
+/**
+ * Update an existing leave rule
+ * @param {number|string} id - rule ID
+ * @param {Object} data - fields to update
+ */
+export const updateLeaveRule = async (id, data) => {
+  if (!id) throw new Error("Rule ID required");
+  return apiRequest(`/api/admin/leave-rules/${id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+};
+
+/**
+ * Delete or deactivate a leave rule
+ * @param {number|string} id - rule ID
+ */
+export const deleteLeaveRule = async (id) => {
+  if (!id) throw new Error("Rule ID required");
+  return apiRequest(`/api/admin/leave-rules/${id}`, {
+    method: "DELETE",
+  });
+};
+
+
+// ---------------------
+// Leave Credit Rules Management
+// ---------------------
+
+/**
+ * Get all credit rules (monthly/annual auto-credits)
+ * Optionally filtered by leaveTypeId
+ */
+export const getCreditRules = async (leaveTypeId = null) => {
+  const url = leaveTypeId
+    ? `/api/admin/credit-rules?leaveTypeId=${leaveTypeId}`
+    : `/api/admin/credit-rules`;
+  return apiRequest(url, { method: "GET" });
+};
+
+/**
+ * Add a new credit rule
+ * @param {Object} rule - e.g. { leaveTypeId, frequency: 'monthly', amount: 1, carryForwardCap: 30 }
+ */
+export const addCreditRule = async (rule) => {
+  if (!rule || !rule.leaveTypeId)
+    throw new Error("Credit rule data or leaveTypeId missing");
+  return apiRequest("/api/admin/credit-rules", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(rule),
+  });
+};
+
+/**
+ * Update an existing credit rule
+ * @param {number|string} id - rule ID
+ * @param {Object} data - updated fields
+ */
+export const updateCreditRule = async (id, data) => {
+  if (!id) throw new Error("Credit rule ID required");
+  return apiRequest(`/api/admin/credit-rules/${id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+};
+
+/**
+ * Delete a credit rule
+ * @param {number|string} id - rule ID
+ */
+export const deleteCreditRule = async (id) => {
+  if (!id) throw new Error("Credit rule ID required");
+  return apiRequest(`/api/admin/credit-rules/${id}`, {
+    method: "DELETE",
+  });
+};
+
+

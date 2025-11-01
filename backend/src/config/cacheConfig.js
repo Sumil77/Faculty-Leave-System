@@ -25,3 +25,9 @@ export const getTTLForUrl = (url) => {
   console.log("Cache miss:", url);
   return routeCacheRules["__default"];
 };
+
+export const CACHE_KEYS = {
+  LEAVE_TYPES: "leave_types",
+  LEAVE_RULES: "leave_rules",
+  CREDIT_RULES: "credit_rules",
+};

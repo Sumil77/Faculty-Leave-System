@@ -7,11 +7,20 @@ import {
   CompensatoryLeave,
   LeaveType,
   LeaveBalance_normalized,
+  LeaveRule,
+  LeaveCreditRule,
 } from "../models/index.js";
 import { parseError } from "./userController.js";
 import { Op, QueryTypes } from "sequelize";
 import { sequelize } from "../config.js";
 import redis from "../redis.js"; // centralized redis
+import { CACHE_KEYS } from "../config/cacheConfig.js";
+import { rebuildLeaveCaches } from "../middlewares/cacheHandler.js";
+import {
+  leaveTypeSchema,
+  leaveRuleSchema,
+  creditRuleSchema,
+} from "../validators/leaveValidations.js";
 
 export const getRequests = async (req, res) => {
   try {
@@ -509,77 +518,6 @@ export const grantCpl = async (req, res) => {
   }
 };
 
-const CACHE_KEY = "leave_types";
-
-// 🧠 Fetch all leave types
-export const getAllLeaveTypes = async (req, res) => {
-  try {
-    const cached = await redis.get(CACHE_KEY);
-    if (cached) {
-      return res.json(JSON.parse(cached));
-    }
-
-    const leaveTypes = await LeaveType.findAll({ where: { active: true } });
-    await redis.set(CACHE_KEY, JSON.stringify(leaveTypes), "EX", 3600); // redis 1 hour
-    res.json(leaveTypes);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-};
-
-// ➕ Add new leave type
-export const addLeaveType = async (req, res) => {
-  try {
-    const leaveType = await LeaveType.create(req.body);
-    const users = await User.findAll({ attributes: ["user_id"], raw: true });
-    const rows = users.flatMap((u) => ({
-      user_id: u.user_id,
-      leave_type_id: newType.id,
-      balance: newType.defaultBalance || 0,
-    }));
-    await LeaveBalance_normalized.bulkCreate(rows, { ignoreDuplicates: true });
-    await redis.del(CACHE_KEY); // clear redis after changes
-    res.status(201).json(leaveType);
-  } catch (err) {
-    res.status(400).json({ error: err.message });
-  }
-};
-
-// ✏️ Update leave type
-export const updateLeaveType = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const [updated] = await LeaveType.update(req.body, { where: { id } });
-    if (!updated)
-      return res.status(404).json({ error: "Leave type not found" });
-
-    await redis.del(CACHE_KEY);
-    const updatedType = await LeaveType.findByPk(id);
-    res.json(updatedType);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-};
-
-// ❌ Delete or deactivate
-export const deactivateLeaveType = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const leaveType = await LeaveType.findByPk(id);
-    if (!leaveType)
-      return res.status(404).json({ error: "Leave type not found" });
-
-    leaveType.active = false;
-    await leaveType.save();
-    await redis.del(CACHE_KEY);
-
-    res.json({ message: "Leave type deactivated" });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-};
-
-
 export const grantCplV2 = async (req, res) => {
   const transaction = await sequelize.transaction();
   const grantedBy = req.body.grantedBy;
@@ -622,10 +560,400 @@ export const grantCplV2 = async (req, res) => {
     }
 
     await transaction.commit();
-    return res.status(200).send("✅ Granted Compensatory Leaves Successfully (v2)");
+    return res
+      .status(200)
+      .send("✅ Granted Compensatory Leaves Successfully (v2)");
   } catch (error) {
     await transaction.rollback();
     console.error(error);
     return res.status(400).send(parseError(error));
+  }
+};
+
+/* ----------------------
+   Leave Type controllers
+   ---------------------- */
+
+export const getAllLeaveTypes = async (req, res) => {
+  try {
+    // prefer canonical cache key
+    const cached = await redis.get(CACHE_KEYS.LEAVE_TYPES);
+    if (cached) return res.json(JSON.parse(cached));
+
+    const leaveTypes = await LeaveType.findAll({ where: { active: true } });
+    (await redis.setEx)
+      ? await redis.setEx(
+          CACHE_KEYS.LEAVE_TYPES,
+          3600,
+          JSON.stringify(leaveTypes)
+        )
+      : await redis.set(
+          CACHE_KEYS.LEAVE_TYPES,
+          JSON.stringify(leaveTypes),
+        );
+
+        
+    return res.json(leaveTypes);
+  } catch (err) {
+    console.error("getAllLeaveTypes:", err);
+    return res.status(500).json({ error: err.message });
+  }
+};
+
+export const getLeaveTypeById = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const leaveType = await LeaveType.findByPk(id);
+    if (!leaveType)
+      return res.status(404).json({ error: "Leave type not found" });
+    return res.json(leaveType);
+  } catch (err) {
+    console.error("getLeaveTypeById:", err);
+    return res.status(500).json({ error: err.message });
+  }
+};
+
+export const addLeaveType = async (req, res) => {
+  const t = await sequelize.transaction();
+  try {
+    const { error } = leaveTypeSchema.validate(req.body);
+    if (error) {
+      await t.rollback();
+      return res.status(400).json({ error: error.message });
+    }
+
+    const newType = await LeaveType.create(req.body, { transaction: t });
+
+    // bulk create user balances (safe, transactional)
+    const users = await User.findAll({
+      attributes: ["user_id"],
+      raw: true,
+      transaction: t,
+    });
+    const rows = users.map((u) => ({
+      user_id: u.user_id,
+      leave_type_id: newType.id,
+      balance: newType.defaultBalance || 0,
+    }));
+
+    if (rows.length) {
+      await LeaveBalance_normalized.bulkCreate(rows, {
+        ignoreDuplicates: true,
+        transaction: t,
+      });
+    }
+
+    await t.commit();
+
+    // rebuild caches
+    await rebuildLeaveCaches();
+
+    return res.status(201).json(newType);
+  } catch (err) {
+    await t.rollback();
+    console.error("addLeaveType error:", err);
+    return res.status(400).json({ error: err.message });
+  }
+};
+
+export const updateLeaveType = async (req, res) => {
+  const t = await sequelize.transaction();
+  try {
+    const { id } = req.params;
+    const { error } = leaveTypeSchema.validate(req.body, {
+      presence: "optional",
+    });
+    if (error) {
+      await t.rollback();
+      return res.status(400).json({ error: error.message });
+    }
+
+    const [updated] = await LeaveType.update(req.body, {
+      where: { id },
+      transaction: t,
+    });
+    if (!updated) {
+      await t.rollback();
+      return res.status(404).json({ error: "Leave type not found" });
+    }
+
+    await t.commit();
+    await rebuildLeaveCaches();
+    const updatedType = await LeaveType.findByPk(id);
+    return res.json(updatedType);
+  } catch (err) {
+    await t.rollback();
+    console.error("updateLeaveType error:", err);
+    return res.status(500).json({ error: err.message });
+  }
+};
+
+export const deactivateLeaveType = async (req, res) => {
+  const t = await sequelize.transaction();
+  try {
+    const { id } = req.params;
+    const leaveType = await LeaveType.findByPk(id, { transaction: t });
+    if (!leaveType) {
+      await t.rollback();
+      return res.status(404).json({ error: "Leave type not found" });
+    }
+    leaveType.active = false;
+    await leaveType.save({ transaction: t });
+    await t.commit();
+
+    await rebuildLeaveCaches();
+    return res.json({ message: "Leave type deactivated" });
+  } catch (err) {
+    await t.rollback();
+    console.error("deactivateLeaveType error:", err);
+    return res.status(500).json({ error: err.message });
+  }
+};
+
+/* ----------------------
+   Leave Rule controllers
+   ---------------------- */
+
+export const getLeaveRules = async (req, res) => {
+  try {
+    // support query param leaveTypeId
+    const { leaveTypeId } = req.query;
+
+    const cached = await redis.get(CACHE_KEYS.LEAVE_RULES);
+    if (cached) {
+      const list = JSON.parse(cached);
+      if (leaveTypeId)
+        return res.json(
+          list.filter((r) => r.leave_type_id === Number(leaveTypeId))
+        );
+      return res.json(list);
+    }
+
+    const where = { active: true };
+    if (leaveTypeId) where.leave_type_id = leaveTypeId;
+
+    const rules = await LeaveRule.findAll({ where });
+    (await redis.setEx)
+      ? await redis.setEx(CACHE_KEYS.LEAVE_RULES, 3600, JSON.stringify(rules))
+      : await redis.set(
+          CACHE_KEYS.LEAVE_RULES,
+          JSON.stringify(rules)
+        );
+    return res.json(rules);
+  } catch (err) {
+    console.error("getLeaveRules:", err);
+    return res.status(500).json({ error: err.message });
+  }
+};
+
+export const addLeaveRule = async (req, res) => {
+  const t = await sequelize.transaction();
+  try {
+    const { error } = leaveRuleSchema.validate(req.body);
+    if (error) {
+      await t.rollback();
+      return res.status(400).json({ error: error.message });
+    }
+
+    // Ensure leave type exists
+    const leaveType = await LeaveType.findByPk(req.body.leave_type_id, {
+      transaction: t,
+    });
+    if (!leaveType) {
+      await t.rollback();
+      return res.status(404).json({ error: "Leave type not found" });
+    }
+
+    const newRule = await LeaveRule.create(req.body, { transaction: t });
+    await t.commit();
+
+    // refresh caches
+    await rebuildLeaveCaches();
+
+    return res.status(201).json(newRule);
+  } catch (err) {
+    await t.rollback();
+    console.error("addLeaveRule error:", err);
+    return res.status(400).json({ error: err.message });
+  }
+};
+
+export const updateLeaveRule = async (req, res) => {
+  const t = await sequelize.transaction();
+  try {
+    const { id } = req.params;
+    const { error } = leaveRuleSchema.validate(req.body, {
+      presence: "optional",
+    });
+    if (error) {
+      await t.rollback();
+      return res.status(400).json({ error: error.message });
+    }
+
+    const [updated] = await LeaveRule.update(req.body, {
+      where: { id },
+      transaction: t,
+    });
+    if (!updated) {
+      await t.rollback();
+      return res.status(404).json({ error: "Leave rule not found" });
+    }
+
+    await t.commit();
+    await rebuildLeaveCaches();
+    const updatedRule = await LeaveRule.findByPk(id);
+    return res.json(updatedRule);
+  } catch (err) {
+    await t.rollback();
+    console.error("updateLeaveRule error:", err);
+    return res.status(500).json({ error: err.message });
+  }
+};
+
+export const deleteLeaveRule = async (req, res) => {
+  const t = await sequelize.transaction();
+  try {
+    const { id } = req.params;
+    const r = await LeaveRule.findByPk(id, { transaction: t });
+    if (!r) {
+      await t.rollback();
+      return res.status(404).json({ error: "Leave rule not found" });
+    }
+
+    // soft delete
+    r.active = false;
+    await r.save({ transaction: t });
+    await t.commit();
+
+    await rebuildLeaveCaches();
+    return res.json({ message: "Leave rule deactivated" });
+  } catch (err) {
+    await t.rollback();
+    console.error("deleteLeaveRule error:", err);
+    return res.status(500).json({ error: err.message });
+  }
+};
+
+/* ----------------------
+   Leave Credit Rule controllers
+   ---------------------- */
+
+export const getCreditRules = async (req, res) => {
+  try {
+    const { leaveTypeId } = req.query;
+
+    const cached = await redis.get(CACHE_KEYS.CREDIT_RULES);
+    if (cached) {
+      const list = JSON.parse(cached);
+      if (leaveTypeId)
+        return res.json(
+          list.filter((r) => r.leave_type_id === Number(leaveTypeId))
+        );
+      return res.json(list);
+    }
+
+    const where = { active: true };
+    if (leaveTypeId) where.leave_type_id = leaveTypeId;
+
+    const creditRules = await LeaveCreditRule.findAll({ where });
+    (await redis.setEx)
+      ? await redis.setEx(
+          CACHE_KEYS.CREDIT_RULES,
+          3600,
+          JSON.stringify(creditRules)
+        )
+      : await redis.set(
+          CACHE_KEYS.CREDIT_RULES,
+          JSON.stringify(creditRules)
+        );
+
+        
+    return res.json(creditRules);
+  } catch (err) {
+    console.error("getCreditRules:", err);
+    return res.status(500).json({ error: err.message });
+  }
+};
+
+export const addCreditRule = async (req, res) => {
+  const t = await sequelize.transaction();
+  try {
+    const { error } = creditRuleSchema.validate(req.body);
+    if (error) {
+      await t.rollback();
+      return res.status(400).json({ error: error.message });
+    }
+
+    const leaveType = await LeaveType.findByPk(req.body.leave_type_id, {
+      transaction: t,
+    });
+    if (!leaveType) {
+      await t.rollback();
+      return res.status(404).json({ error: "Leave type not found" });
+    }
+
+    const newRule = await LeaveCreditRule.create(req.body, { transaction: t });
+    await t.commit();
+
+    await rebuildLeaveCaches();
+    return res.status(201).json(newRule);
+  } catch (err) {
+    await t.rollback();
+    console.error("addCreditRule error:", err);
+    return res.status(400).json({ error: err.message });
+  }
+};
+
+export const updateCreditRule = async (req, res) => {
+  const t = await sequelize.transaction();
+  try {
+    const { id } = req.params;
+    const { error } = creditRuleSchema.validate(req.body, {
+      presence: "optional",
+    });
+    if (error) {
+      await t.rollback();
+      return res.status(400).json({ error: error.message });
+    }
+
+    const [updated] = await LeaveCreditRule.update(req.body, {
+      where: { id },
+      transaction: t,
+    });
+    if (!updated) {
+      await t.rollback();
+      return res.status(404).json({ error: "Credit rule not found" });
+    }
+
+    await t.commit();
+    await rebuildLeaveCaches();
+    const updatedRule = await LeaveCreditRule.findByPk(id);
+    return res.json(updatedRule);
+  } catch (err) {
+    await t.rollback();
+    console.error("updateCreditRule error:", err);
+    return res.status(500).json({ error: err.message });
+  }
+};
+
+export const deleteCreditRule = async (req, res) => {
+  const t = await sequelize.transaction();
+  try {
+    const { id } = req.params;
+    const r = await LeaveCreditRule.findByPk(id, { transaction: t });
+    if (!r) {
+      await t.rollback();
+      return res.status(404).json({ error: "Credit rule not found" });
+    }
+    r.active = false;
+    await r.save({ transaction: t });
+    await t.commit();
+
+    await rebuildLeaveCaches();
+    return res.json({ message: "Credit rule deactivated" });
+  } catch (err) {
+    await t.rollback();
+    console.error("deleteCreditRule error:", err);
+    return res.status(500).json({ error: err.message });
   }
 };

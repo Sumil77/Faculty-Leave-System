@@ -138,7 +138,7 @@ export async function generateHistoryCSV(data) {
   ]);
 
   const headers = [
-    "User ID",
+    "UID",
     "Name",
     "Dept",
     "Applied On",
