@@ -6,7 +6,7 @@ export default function SummaryTable({ leaves }) {
     <table className="min-w-full bg-white rounded-xl shadow">
       <thead className="bg-gray-200 sticky top-0">
         <tr>
-          <th className="p-2 border">User ID</th>
+          <th className="p-2 border">UID</th>
           <th className="p-2 border text-left">Name</th>
           <th className="p-2 border text-left">Dept.</th>
           {Object.entries(leaveTypes).map(([key, type]) => (
@@ -23,9 +23,8 @@ export default function SummaryTable({ leaves }) {
               <td className="p-2 border">{l.user_id}</td>
               <td className="p-2 border">{l.name}</td>
               <td className="p-2 border">{l.dept}</td>
-              {Object.keys(leaveTypes).map((key) => {
-                const backendKey = key === "extraOrdinary" ? "extraordinary" : key;
-                const value = l[backendKey];
+              {Object.entries(leaveTypes).map(([key, type]) => {
+                const value = l[type.acronym];
                 return (
                   <td key={key} className="p-2 border text-center">
                     {value === null || value === undefined ? "-" : value}

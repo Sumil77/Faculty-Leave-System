@@ -1,16 +1,16 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
-import { createAsyncThunk } from "@reduxjs/toolkit";
 import { apiRequest } from "../util/api"; // adjust path as needed
 
 export const fetchGlobals = createAsyncThunk(
   "global/fetchGlobals",
   async (_, { rejectWithValue }) => {
     try {
-      // fetch both in parallel
+      console.log("🔹 Fetching globals...");
       const [leaveRes, deptRes] = await Promise.all([
-        apiRequest("/users/leave-types"),
-        apiRequest("/users/dept-list"),
+        apiRequest("/api/session/leave-types", { method: "GET" }),
+        apiRequest("/api/session/dept-list", { method: "GET" }),
       ]);
+      console.log("✅ Got globals:", { leaveRes, deptRes });
 
       return {
         leaveTypes: leaveRes,
@@ -18,7 +18,7 @@ export const fetchGlobals = createAsyncThunk(
         lastFetched: Date.now(),
       };
     } catch (error) {
-      console.error("Global fetch failed:", error);
+      console.error("❌ Global fetch failed:", error);
       return rejectWithValue(
         error?.message || "Failed to fetch global configuration"
       );

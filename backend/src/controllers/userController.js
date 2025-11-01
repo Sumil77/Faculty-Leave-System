@@ -1,4 +1,8 @@
 import { Credentials, User } from "../models/index.js";
+import {
+  getLeaveTypesV2,
+  defaultLeaveTypes,
+} from "../validators/leaveValidations.js";
 
 export const parseError = (err) => {
   if (err.isJoi) {
@@ -44,7 +48,13 @@ export const createUser = async (req, res) => {
 
     // await signUp.validateAsync({ user_id, email, password });
 
-    const newUser = await Credentials.create({ user_id, email, password, role, status });
+    const newUser = await Credentials.create({
+      user_id,
+      email,
+      password,
+      role,
+      status,
+    });
 
     res.status(201).send("User created");
   } catch (err) {
@@ -71,10 +81,10 @@ export const updateUser = async (req, res) => {
     }
 
     console.log("UserId: ", user_id);
-    
+
     const user = await User.findByPk(user_id);
     console.log(user);
-    
+
     await user.update(fields);
     return res.status(200).send(user);
   } catch (error) {

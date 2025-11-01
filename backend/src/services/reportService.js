@@ -199,17 +199,26 @@ export async function generateHistoryExcel(data) {
   return await workbook.xlsx.writeBuffer();
 }
 
-export async function generateHistoryPDF(data) {
-  const pdfDoc = await PDFDocument.create();
-  const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+export async function generateHistoryPDF(data = []) {
+  const leaveTypes = await getLeaveTypes(); // ✅ array
+  const doc = new PDFDocument({
+    size: "A4",
+    layout: "portrait",
+    margin: 40,
+  });
 
-  const fontSize = 10;
-  const margin = 40;
+  const chunks = [];
+  doc.on("data", (chunk) => chunks.push(chunk));
+  const endPromise = new Promise((resolve) =>
+    doc.on("end", () => resolve(Buffer.concat(chunks)))
+  );
+
+  const fontSize = 9;
   const rowHeight = 20;
-  const colPadding = 5;
+  const padding = 5;
 
   const headers = [
-    "User ID",
+    "UID",
     "Name",
     "Dept",
     "Applied On",
@@ -219,94 +228,106 @@ export async function generateHistoryPDF(data) {
     "Days",
   ];
 
-  // ✅ Flatten nested structure on the fly
+  // ✅ Flatten nested structure and map acronym from leaveTypes array
   const rows = data.flatMap((user) =>
-    (user.leaves || []).map((leave) => [
-      user.user_id,
-      user.name,
-      user.dept,
-      formatDate(leave.appliedOn),
-      formatDate(leave.fromDate),
-      formatDate(leave.toDate),
-      leave.leaveType,
-      leave.totalDays,
-    ])
+    (user.leaves || []).map((leave) => {
+      const ltKey = (leave.leaveType || "").toLowerCase().trim();
+
+      // Find matching leave type object
+      const matchedType =
+        leaveTypes.find(
+          (lt) =>
+            lt.name.toLowerCase() === ltKey ||
+            lt.acronym.toLowerCase() === ltKey
+        )?.acronym ||
+        leave.leaveType ||
+        "-";
+
+      return [
+        user.user_id,
+        user.name,
+        user.dept,
+        formatDate(leave.appliedOn),
+        formatDate(leave.fromDate),
+        formatDate(leave.toDate),
+        matchedType, // ✅ shows acronym (e.g., CL)
+        leave.totalDays ?? "-",
+      ];
+    })
   );
 
-  if (rows.length === 0) {
-    const page = pdfDoc.addPage();
-    page.drawText("No leave records found.", {
-      x: margin,
-      y: page.getHeight() - margin,
-      size: 14,
-      font,
-      color: rgb(0.6, 0, 0),
-    });
-    return Buffer.from(await pdfDoc.save());
+  // Handle empty
+  if (!rows.length) {
+    doc
+      .font("Helvetica-Bold")
+      .fontSize(14)
+      .text("No leave records found.", 100, 100);
+    doc.end();
+    return await endPromise;
   }
 
-  const getTextWidth = (text) => font.widthOfTextAtSize(String(text), fontSize);
-
+  const measure = (text) => doc.widthOfString(String(text || ""), { fontSize });
   const colWidths = headers.map((header, i) => {
-    const headerWidth = getTextWidth(header);
-    const dataWidth = Math.max(
-      ...rows.map((row) => getTextWidth(row[i] ?? ""))
-    );
-    return Math.max(headerWidth, dataWidth) + colPadding * 2;
+    const headerWidth = measure(header);
+    const dataWidth = Math.max(...rows.map((row) => measure(row[i])));
+    return Math.min(Math.max(headerWidth, dataWidth) + padding * 2, 100);
   });
 
-  const totalTableWidth = colWidths.reduce((sum, w) => sum + w, 0);
-  const pageWidth = 595.28; // A4 portrait width
-  const tableStartX = Math.max(margin, (pageWidth - totalTableWidth) / 2);
-
-  let page = pdfDoc.addPage();
-  const { height: pageHeight } = page.getSize();
-  let y = pageHeight - margin;
+  const tableWidth = colWidths.reduce((a, b) => a + b, 0);
+  const startX = Math.max(40, (doc.page.width - tableWidth) / 2);
+  let y = doc.y + 40;
 
   const drawRow = (row, isHeader = false) => {
-    let x = tableStartX;
+    let x = startX;
+    const height = rowHeight;
+    doc.font(isHeader ? "Helvetica-Bold" : "Helvetica").fontSize(fontSize);
+
     row.forEach((cell, i) => {
-      const value = isHeader ? cell : cell ?? "";
+      let text = String(cell ?? "");
+      const width = colWidths[i];
 
-      page.drawRectangle({
-        x,
-        y: y - rowHeight,
-        width: colWidths[i],
-        height: rowHeight,
-        borderWidth: 0.5,
-        borderColor: rgb(0, 0, 0),
+      // Draw border
+      doc.rect(x, y, width, height).stroke();
+
+      // ✅ Clip long names (or any long text) to prevent overlapping
+      if (i === 1 && measure(text) > width - padding * 2) {
+        while (measure(text + "...") > width - padding * 2 && text.length > 0) {
+          text = text.slice(0, -1);
+        }
+        text += "...";
+      }
+
+      doc.text(text, x + padding, y + padding, {
+        width: width - padding * 2,
+        align: "center",
+        lineBreak: false,
       });
 
-      page.drawText(String(value), {
-        x: x + colPadding,
-        y: y - rowHeight + colPadding,
-        size: fontSize,
-        font,
-        color: rgb(0, 0, 0),
-      });
-
-      x += colWidths[i];
+      x += width;
     });
+    y += height;
   };
 
-  // Draw header
-  drawRow(headers, true);
-  y -= rowHeight;
+  // Title
+  doc
+    .font("Helvetica-Bold")
+    .fontSize(14)
+    .text("Leave History Report", { align: "center" });
+  doc.moveDown(1.5);
 
-  // Draw data rows
+  drawRow(headers, true);
+
   for (const row of rows) {
-    if (y - rowHeight < margin) {
-      page = pdfDoc.addPage();
-      y = page.getHeight() - margin;
-      drawRow(headers, true); // repeat header
-      y -= rowHeight;
+    if (y > doc.page.height - 60) {
+      doc.addPage();
+      y = 60;
+      drawRow(headers, true);
     }
     drawRow(row);
-    y -= rowHeight;
   }
 
-  const pdfBytes = await pdfDoc.save();
-  return Buffer.from(pdfBytes);
+  doc.end();
+  return await endPromise;
 }
 
 export async function getSummary(filters = {}) {

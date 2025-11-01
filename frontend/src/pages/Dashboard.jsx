@@ -168,7 +168,7 @@ const Dashboard = () => {
                 {filteredLeaves.map((leave, index) => (
                   <tr key={index} className="hover:bg-gray-100">
                     <td className="p-3 border-b">{formatDate(leave.fromDate)}</td>
-                    <td className="p-3 border-b">{leaveTypes[leave.leaveType]?.fullName || "Unknown"}</td>
+                    <td className="p-3 border-b">{leaveTypes[leave.leaveType]?.fullName|| "Unknown"}</td>
                     <td className={`p-3 border-b ${getStatusColor(leave.status)}`}>
                       {leave.status}
                     </td>
@@ -209,7 +209,7 @@ const Dashboard = () => {
             >
               <div className="flex items-center space-x-3">
                 <div className="text-xl text-gray-700">{leaveIcons[leaveType]}</div>
-                <span className="text-lg font-semibold text-gray-800">{leaveObj[leaveType].fullName}: </span>
+                <span className="text-lg font-semibold text-gray-800">{leaveTypes[leaveType].fullName}: </span>
               </div>
               <span className="text-lg font-semibold text-gray-900">{balance}</span>
             </div>

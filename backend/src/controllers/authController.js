@@ -3,6 +3,8 @@ import { parseError } from "../controllers/userController.js";
 import { SESS_NAME } from "../config.js";
 import { Credentials, Admin } from "../models/index.js";
 
+import { getLeaveTypesV2, defaultLeaveTypes } from "../validators/leaveValidations.js";
+
 const sessionizeUser = (cred) => {
   /*const sessionizeUser = async (cred) => {
     const isAdmin = await Admin.findOne({ where: { user_id: cred.user_id } });
@@ -14,7 +16,7 @@ const sessionizeUser = (cred) => {
     };
   };*/
 
-  return { user_id: 123, userName: "sumil", dept: "CSE", isAdmin : true };
+  return { user_id: 123, userName: "sumil", dept: "CSE", isAdmin: true };
 };
 
 export const login = async (req, res) => {
@@ -78,4 +80,53 @@ export const getSession = async (req, res) => {
   } else {
     return res.status(200).send({ user });
   }
+};
+
+export const getLeaveTypes = async (req, res) => {
+  try {
+    const redisTypes = await getLeaveTypesV2();
+
+    // Handle both Redis array form & already-normalized fallback
+    let formatted = {};
+
+    if (Array.isArray(redisTypes)) {
+      // Redis stored as array (with id, name, acronym, description)
+      redisTypes.forEach((t) => {
+        formatted[t.name] = {
+          fullName: t.name,
+          acronym: t.acronym,
+        };
+      });
+    } else if (redisTypes && typeof redisTypes === "object") {
+      // Redis already has normalized object form
+      formatted = Object.fromEntries(
+        Object.entries(redisTypes).map(([key, val]) => {
+          // Redis V2 keys may be numeric IDs → skip them
+          const name = val.name || key;
+          return [
+            name,
+            {
+              fullName: name,
+              acronym: val.acronym || "",
+            },
+          ];
+        })
+      );
+    } else {
+      formatted = defaultLeaveTypes; // fallback
+    }
+
+    return res.status(200).send(formatted);
+  } catch (err) {
+    console.error("Error fetching leave types for frontend:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch leave types",
+      data: defaultLeaveTypes, // serve fallback instead of breaking frontend
+    });
+  }
+};
+
+export const getDepartmentList = async (req, res) => {
+  return res.status(200).send();
 };

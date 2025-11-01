@@ -1,5 +1,6 @@
 // src/pages/ReportGenerator.jsx (replace file contents with this)
 import { useState, useEffect, useCallback } from "react";
+import { useSelector } from "react-redux";
 import { FiDownload, FiMail, FiSearch, FiArrowLeft, FiBarChart2, FiChevronDown } from "react-icons/fi";
 import { useNavigate } from "react-router-dom";
 import { getLeaveHistory, mailReport, getLeaveSummary, mailHistoryReport, requestDownload, waitForJobReady, formatMap, fetchDownloadFile } from "../util/admin.js";
@@ -33,6 +34,9 @@ export default function ReportGenerator() {
   const [error, setError] = useState("");
 
   const leaveTypes = useSelector((state) => state.global.leaveTypes);
+
+  console.log(leaveTypes);
+  
 
   const formatDate = (dateString) => {
     const date = new Date(dateString);

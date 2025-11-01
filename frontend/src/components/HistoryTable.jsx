@@ -1,6 +1,5 @@
 import { useSelector } from "react-redux";
 
-
 const formatDate = (dateString) => {
   if (!dateString) return "-";
   const date = new Date(dateString);
@@ -14,11 +13,24 @@ const formatDate = (dateString) => {
 export default function HistoryTable({ leaves = [] }) {
   const leaveTypes = useSelector((state) => state.global.leaveTypes);
 
+  // Flatten all leaves safely
+  const allLeaves = leaves.flatMap((user) =>
+    Array.isArray(user.leaves)
+      ? user.leaves.map((leave) => ({
+          user_id: user.user_id,
+          name: user.name,
+          dept: user.dept,
+          desig: user.desig,
+          ...leave,
+        }))
+      : []
+  );
+
   return (
     <table className="min-w-full bg-white rounded-xl shadow overflow-hidden">
       <thead className="bg-gray-200 sticky top-0 z-10">
         <tr>
-          <th className="p-2 border">User ID</th>
+          <th className="p-2 border">UID</th>
           <th className="p-2 border text-left">Name</th>
           <th className="p-2 border text-left">Dept.</th>
           <th className="p-2 border text-left">Type</th>
@@ -28,18 +40,19 @@ export default function HistoryTable({ leaves = [] }) {
           <th className="p-2 border text-left">Days</th>
         </tr>
       </thead>
+
       <tbody>
-        {leaves.length > 0 ? (
-          leaves.map((leave, idx) => (
+        {allLeaves.length > 0 ? (
+          allLeaves.map((leave, idx) => (
             <tr key={idx} className="border-b hover:bg-gray-50">
               <td className="p-2 border">{leave.user_id}</td>
               <td className="p-2 border">{leave.name || "-"}</td>
               <td className="p-2 border">{leave.dept || "-"}</td>
               <td
                 className="p-2 border"
-                title={leaveTypes[leave.leaveType]?.fullName || leave.leaveType || "-"}
+                title={leaveTypes?.[leave.leaveType]?.fullName || leave.leaveType || "-"}
               >
-                {leaveTypes[leave.leaveType]?.acronym || leave.leaveType || "-"}
+                {leaveTypes?.[leave.leaveType]?.acronym || leave.leaveType || "-"}
               </td>
               <td className="p-2 border">{formatDate(leave.appliedOn)}</td>
               <td className="p-2 border">{formatDate(leave.fromDate)}</td>
@@ -54,7 +67,6 @@ export default function HistoryTable({ leaves = [] }) {
             </td>
           </tr>
         )}
-
       </tbody>
     </table>
   );

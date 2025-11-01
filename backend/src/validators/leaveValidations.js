@@ -17,6 +17,7 @@ export const defaultLeaveTypes = {
   withoutPay: { fullName: "Without Pay", acronym: "WPL" },
 };
 
+
 // Fetch leave types dynamically
 export const getLeaveTypes = async () => {
   const cachedTypes = await redisClient.get("leave_types");
@@ -148,6 +149,9 @@ export const getLeaveTypesV2 = async () => {
   const normalized = Array.isArray(parsed)
     ? Object.fromEntries(parsed.map((t) => [String(t.id), t]))
     : parsed;
+
+    console.log(normalized);
+    
 
   return normalized;
 };
