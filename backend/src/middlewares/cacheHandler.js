@@ -9,8 +9,14 @@ import { getTTLForUrl, CACHE_KEYS } from "../config/cacheConfig.js";
  * Adds X-Cache header to indicate HIT or MISS.
  */
 
-export const setCache = async (key, value, ttl = 3600) => {
+export const setCache = async (key, value, ttl) => {
   const str = JSON.stringify(value);
+
+  // If no TTL specified, store permanently
+  if (!ttl) {
+    return redis.set(key, str);
+  }
+
   if (typeof redis.setEx === "function") {
     await redis.setEx(key, ttl, str);
     return;
@@ -55,7 +61,6 @@ export const rebuildLeaveCaches = async (ttlSeconds = 3600) => {
     console.error("rebuildLeaveCaches error:", err.message);
   }
 };
-
 
 async function setWithTTL(redis, key, ttlSeconds, value) {
   // node-redis v4: setEx
@@ -129,15 +134,18 @@ export const registerCacheStatsRoute = (app) => {
   });
 };
 
-
 export async function cacheRules() {
-  const leaveRules = await LeaveRule.findAll({ where: { active: true } });
-  const creditRules = await LeaveCreditRule.findAll({
-    where: { active: true },
-  });
-  const leaveType = await LeaveType.findAll({ where: { active: true } });
+  try {
+    const leaveRules = await LeaveRule.findAll({ where: { active: true } });
+    const creditRules = await LeaveCreditRule.findAll({
+      where: { active: true },
+    });
+    const leaveType = await LeaveType.findAll({ where: { active: true } });
 
-  await setCache(CACHE_KEYS.LEAVE_TYPES, leaveType);
-  await setCache(CACHE_KEYS.LEAVE_RULES, leaveRules);
-  await setCache(CACHE_KEYS.CREDIT_RULES, creditRules);
+    await setCache(CACHE_KEYS.LEAVE_TYPES, leaveType);
+    await setCache(CACHE_KEYS.LEAVE_RULES, leaveRules);
+    await setCache(CACHE_KEYS.CREDIT_RULES, creditRules);
+  } catch (err) {
+    console.error("CacheRules error:", err.message);
+  }
 }

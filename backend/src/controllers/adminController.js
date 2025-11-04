@@ -15,7 +15,7 @@ import { Op, QueryTypes } from "sequelize";
 import { sequelize } from "../config.js";
 import redis from "../redis.js"; // centralized redis
 import { CACHE_KEYS } from "../config/cacheConfig.js";
-import { rebuildLeaveCaches } from "../middlewares/cacheHandler.js";
+import { cacheRules } from "../middlewares/cacheHandler.js";
 import {
   leaveTypeSchema,
   leaveRuleSchema,
@@ -587,12 +587,8 @@ export const getAllLeaveTypes = async (req, res) => {
           3600,
           JSON.stringify(leaveTypes)
         )
-      : await redis.set(
-          CACHE_KEYS.LEAVE_TYPES,
-          JSON.stringify(leaveTypes),
-        );
+      : await redis.set(CACHE_KEYS.LEAVE_TYPES, JSON.stringify(leaveTypes));
 
-        
     return res.json(leaveTypes);
   } catch (err) {
     console.error("getAllLeaveTypes:", err);
@@ -646,7 +642,7 @@ export const addLeaveType = async (req, res) => {
     await t.commit();
 
     // rebuild caches
-    await rebuildLeaveCaches();
+    await cacheRules();
 
     return res.status(201).json(newType);
   } catch (err) {
@@ -678,7 +674,7 @@ export const updateLeaveType = async (req, res) => {
     }
 
     await t.commit();
-    await rebuildLeaveCaches();
+    await cacheRules();
     const updatedType = await LeaveType.findByPk(id);
     return res.json(updatedType);
   } catch (err) {
@@ -701,7 +697,7 @@ export const deactivateLeaveType = async (req, res) => {
     await leaveType.save({ transaction: t });
     await t.commit();
 
-    await rebuildLeaveCaches();
+    await cacheRules();
     return res.json({ message: "Leave type deactivated" });
   } catch (err) {
     await t.rollback();
@@ -735,10 +731,8 @@ export const getLeaveRules = async (req, res) => {
     const rules = await LeaveRule.findAll({ where });
     (await redis.setEx)
       ? await redis.setEx(CACHE_KEYS.LEAVE_RULES, 3600, JSON.stringify(rules))
-      : await redis.set(
-          CACHE_KEYS.LEAVE_RULES,
-          JSON.stringify(rules)
-        );
+      : await redis.set(CACHE_KEYS.LEAVE_RULES, JSON.stringify(rules));
+    console.log("Fetched Leave Rules:", rules);
     return res.json(rules);
   } catch (err) {
     console.error("getLeaveRules:", err);
@@ -768,7 +762,7 @@ export const addLeaveRule = async (req, res) => {
     await t.commit();
 
     // refresh caches
-    await rebuildLeaveCaches();
+    await cacheRules();
 
     return res.status(201).json(newRule);
   } catch (err) {
@@ -781,14 +775,18 @@ export const addLeaveRule = async (req, res) => {
 export const updateLeaveRule = async (req, res) => {
   const t = await sequelize.transaction();
   try {
+    console.log(req.body);
     const { id } = req.params;
     const { error } = leaveRuleSchema.validate(req.body, {
       presence: "optional",
     });
     if (error) {
       await t.rollback();
+      console.log(error);
       return res.status(400).json({ error: error.message });
     }
+
+    
 
     const [updated] = await LeaveRule.update(req.body, {
       where: { id },
@@ -800,12 +798,12 @@ export const updateLeaveRule = async (req, res) => {
     }
 
     await t.commit();
-    await rebuildLeaveCaches();
+    await cacheRules();
     const updatedRule = await LeaveRule.findByPk(id);
     return res.json(updatedRule);
   } catch (err) {
     await t.rollback();
-    console.error("updateLeaveRule error:", err);
+    console.log("updateLeaveRule error:", err);
     return res.status(500).json({ error: err.message });
   }
 };
@@ -825,7 +823,7 @@ export const deleteLeaveRule = async (req, res) => {
     await r.save({ transaction: t });
     await t.commit();
 
-    await rebuildLeaveCaches();
+    await cacheRules();
     return res.json({ message: "Leave rule deactivated" });
   } catch (err) {
     await t.rollback();
@@ -841,6 +839,8 @@ export const deleteLeaveRule = async (req, res) => {
 export const getCreditRules = async (req, res) => {
   try {
     const { leaveTypeId } = req.query;
+    console.log(leaveTypeId);
+    
 
     const cached = await redis.get(CACHE_KEYS.CREDIT_RULES);
     if (cached) {
@@ -862,12 +862,9 @@ export const getCreditRules = async (req, res) => {
           3600,
           JSON.stringify(creditRules)
         )
-      : await redis.set(
-          CACHE_KEYS.CREDIT_RULES,
-          JSON.stringify(creditRules)
-        );
+      : await redis.set(CACHE_KEYS.CREDIT_RULES, JSON.stringify(creditRules));
 
-        
+      console.log("Fetched Credit Rules:", creditRules);
     return res.json(creditRules);
   } catch (err) {
     console.error("getCreditRules:", err);
@@ -895,7 +892,7 @@ export const addCreditRule = async (req, res) => {
     const newRule = await LeaveCreditRule.create(req.body, { transaction: t });
     await t.commit();
 
-    await rebuildLeaveCaches();
+    await cacheRules();
     return res.status(201).json(newRule);
   } catch (err) {
     await t.rollback();
@@ -926,7 +923,7 @@ export const updateCreditRule = async (req, res) => {
     }
 
     await t.commit();
-    await rebuildLeaveCaches();
+    await cacheRules();
     const updatedRule = await LeaveCreditRule.findByPk(id);
     return res.json(updatedRule);
   } catch (err) {
@@ -949,7 +946,7 @@ export const deleteCreditRule = async (req, res) => {
     await r.save({ transaction: t });
     await t.commit();
 
-    await rebuildLeaveCaches();
+    await cacheRules();
     return res.json({ message: "Credit rule deactivated" });
   } catch (err) {
     await t.rollback();

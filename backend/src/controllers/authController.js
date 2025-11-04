@@ -3,7 +3,10 @@ import { parseError } from "../controllers/userController.js";
 import { SESS_NAME } from "../config.js";
 import { Credentials, Admin } from "../models/index.js";
 
-import { getLeaveTypesV2, defaultLeaveTypes } from "../validators/leaveValidations.js";
+import {
+  getLeaveTypesV2,
+  defaultLeaveTypes,
+} from "../validators/leaveValidations.js";
 
 const sessionizeUser = (cred) => {
   /*const sessionizeUser = async (cred) => {
@@ -86,7 +89,6 @@ export const getLeaveTypes = async (req, res) => {
   try {
     const redisTypes = await getLeaveTypesV2();
 
-    // Handle both Redis array form & already-normalized fallback
     let formatted = {};
 
     if (Array.isArray(redisTypes)) {
@@ -95,25 +97,35 @@ export const getLeaveTypes = async (req, res) => {
         formatted[t.name] = {
           fullName: t.name,
           acronym: t.acronym,
+          leaveTypeId: t.id, // ✅ add leaveTypeId here
         };
       });
     } else if (redisTypes && typeof redisTypes === "object") {
       // Redis already has normalized object form
       formatted = Object.fromEntries(
         Object.entries(redisTypes).map(([key, val]) => {
-          // Redis V2 keys may be numeric IDs → skip them
           const name = val.name || key;
           return [
             name,
             {
               fullName: name,
               acronym: val.acronym || "",
+              leaveTypeId: val.id || key, // ✅ support both numeric ID or key
             },
           ];
         })
       );
     } else {
-      formatted = defaultLeaveTypes; // fallback
+      // fallback
+      formatted = Object.fromEntries(
+        Object.entries(defaultLeaveTypes).map(([key, val], idx) => [
+          key,
+          {
+            ...val,
+            leaveTypeId: idx + 1, // ✅ give default numeric ID
+          },
+        ])
+      );
     }
 
     return res.status(200).send(formatted);
@@ -122,7 +134,7 @@ export const getLeaveTypes = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Failed to fetch leave types",
-      data: defaultLeaveTypes, // serve fallback instead of breaking frontend
+      data: defaultLeaveTypes,
     });
   }
 };

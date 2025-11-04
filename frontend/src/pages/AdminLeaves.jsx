@@ -1,342 +1,296 @@
 import { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { fetchGlobals } from "../store/global";
 import {
     getLeaveTypes,
     addLeaveType,
     updateLeaveType,
-    deactivateLeaveType,
     getLeaveRules,
-    addLeaveRule,
     updateLeaveRule,
-    deleteLeaveRule,
     getCreditRules,
-    addCreditRule,
     updateCreditRule,
-    deleteCreditRule,
 } from "../util/admin";
+import { fetchGlobals } from "../store/global";
 
-export default function LeaveTypePage() {
+export default function AdminLeaves() {
     const dispatch = useDispatch();
-    const global = useSelector((s) => s.global);
-    const [selectedType, setSelectedType] = useState(null);
-    const [loading, setLoading] = useState(false);
-    const [rules, setRules] = useState([]);
+    const leaveTypes = useSelector((s) => s.global.leaveTypes);
+
+    const [selectedLeaveType, setSelectedLeaveType] = useState(null);
+    const [leaveRules, setLeaveRules] = useState([]);
     const [creditRules, setCreditRules] = useState([]);
-    const [leaveTypes, setLeaveTypes] = useState([]);
+    const [newLeaveType, setNewLeaveType] = useState({
+        name: "",
+        defaultBalance: "",
+    });
+
+    const [originalLeaveRules, setOriginalLeaveRules] = useState([]);
+    const [originalCreditRules, setOriginalCreditRules] = useState([]);
 
 
+
+
+    // Fetch leave types on load
     useEffect(() => {
-        (async () => {
-            dispatch(fetchGlobals()); // still keep this for reset or other global data
-            try {
-                const data = await getLeaveTypes();
-                const normalized = Array.isArray(data)
-                    ? data
-                    : data?.data || Object.values(data || {});
-                setLeaveTypes(normalized);
-            } catch (err) {
-                console.error("Failed to fetch leave types:", err);
-            }
-        })();
-    }, [dispatch]);
-
-    const refreshRules = async (typeId) => {
-        if (!typeId) {
-            console.warn("refreshRules called without typeId");
-            return;
+        if (!leaveTypes || Object.keys(leaveTypes).length === 0) {
+            dispatch(fetchGlobals());
         }
+    }, [dispatch, leaveTypes]);
 
-        setLoading(true);
+    // Fetch rules when leave type selected
+    const handleSelectLeaveType = async (lt) => {
+        setSelectedLeaveType(lt);
+        const leaveTypeId = lt.leaveTypeId;
+        if (!leaveTypeId) return;
+
         try {
-            const [rRaw, cRaw] = await Promise.all([
-                getLeaveRules(typeId),
-                getCreditRules(typeId),
+            const [rules, credits] = await Promise.all([
+                getLeaveRules(leaveTypeId),
+                getCreditRules(leaveTypeId),
             ]);
 
-            console.log("🔹 Raw leaveRules:", rRaw);
-            console.log("🔹 Raw creditRules:", cRaw);
+            setLeaveRules(rules || []);
+            setCreditRules(credits || []);
 
-            // --- Normalization that works for ALL formats ---
-            const normalize = (raw) => {
-                if (!raw) return [];
-                if (Array.isArray(raw)) return raw;
-                if (raw.data && Array.isArray(raw.data)) return raw.data;
-                if (typeof raw === "object") {
-                    // Some Redis caches return object with keys as ids
-                    const vals = Object.values(raw);
-                    if (vals.every((v) => typeof v === "object")) return vals;
-                }
-                return [];
-            };
-
-            const rulesData = normalize(rRaw);
-            const creditData = normalize(cRaw);
-
-            console.log("✅ Normalized Rules:", rulesData);
-            console.log("✅ Normalized Credits:", creditData);
-
-            // Filter by leave_type_id — backend uses snake_case
-            const sameId = (a, b) => Number(a) === Number(b);
-
-            const rList = uniqueById(normalizeList(rRaw)).filter((r) =>
-                sameId(r.leave_type_id || r.leaveTypeId, typeId)
-            );
-            const cList = uniqueById(normalizeList(cRaw)).filter((r) =>
-                sameId(r.leave_type_id || r.leaveTypeId, typeId)
-            );
-            
-            console.log("📊 Final Fetched Rules:", filteredRules);
-            console.log("📊 Final Fetched Credit Rules:", filteredCredits);
-
-            setRules(filteredRules);
-            setCreditRules(filteredCredits);
-        } catch (e) {
-            console.error("refreshRules error:", e);
-            setRules([]);
-            setCreditRules([]);
-        } finally {
-            setLoading(false);
+            // Keep deep copies for diffing later
+            setOriginalLeaveRules(JSON.parse(JSON.stringify(rules || [])));
+            setOriginalCreditRules(JSON.parse(JSON.stringify(credits || [])));
+        } catch (err) {
+            console.error("Error fetching rules:", err);
         }
     };
 
+    const getChangedFields = (original, updated) => {
+        const diff = {};
+        for (const key in updated) {
+            if (
+                !["id", "leave_type_id", "createdAt", "updatedAt"].includes(key) &&
+                JSON.stringify(original[key]) !== JSON.stringify(updated[key])
+            ) {
+                diff[key] = updated[key];
+            }
+        }
+        return diff;
+    };
 
 
-    const handleSelectType = async (type) => {
-        console.log("🟨 handleSelectType received:", type);
+    // Handle add leave type
+    const handleAddLeaveType = async (e) => {
+        e.preventDefault();
+        if (!newLeaveType.name) return alert("Leave type name required");
+        await addLeaveType(newLeaveType);
+        setNewLeaveType({ name: "", defaultBalance: "" });
+        dispatch(fetchGlobals());
+    };
 
-        // Handle both backend and normalized formats
-        const typeId =
-            type?.id ||
-            type?.leave_type_id ||
-            type?.leaveTypeId ||
-            type?.type_id ||
-            type?.typeId;
+    // Update rule helper
+    const handleRuleChange = (ruleList, setRuleList, id, field, value) => {
+        const updated = ruleList.map((r) =>
+            r.id === id ? { ...r, [field]: value } : r
+        );
+        setRuleList(updated);
+    };
 
-        console.log("🟩 Resolved typeId:", typeId);
+    const handleSaveRule = async (rule, type) => {
+        const originalList = type === "leave" ? originalLeaveRules : originalCreditRules;
+        const originalRule = originalList.find((r) => r.id === rule.id);
 
-        if (!typeId) {
-            console.warn("⚠️ handleSelectType: Missing typeId for", type);
+        if (!originalRule) {
+            alert("Original rule not found!");
             return;
         }
 
-        setSelectedType(type);
-        await refreshRules(typeId);
+        const changedFields = getChangedFields(originalRule, rule);
+        if (Object.keys(changedFields).length === 0) {
+            alert("No changes to save!");
+            return;
+        }
+
+        // Type normalization
+        const cleanRule = Object.fromEntries(
+            Object.entries(changedFields).map(([key, value]) => [
+                key,
+                value === "true"
+                    ? true
+                    : value === "false"
+                        ? false
+                        : !isNaN(value) && value !== ""
+                            ? Number(value)
+                            : value,
+            ])
+        );
+
+        if (!cleanRule.leave_type_id && rule.leave_type_id) {
+            cleanRule.leave_type_id = rule.leave_type_id;
+        }
+
+        try {
+            if (type === "leave") await updateLeaveRule(rule.id, cleanRule);
+            else await updateCreditRule(rule.id, cleanRule);
+
+            alert("Rule updated successfully!");
+        } catch (err) {
+            console.error("Save error:", err);
+            alert("Failed to update rule.");
+        }
     };
 
 
-
-    const handleAddLeaveType = async () => {
-        const name = prompt("Enter Leave Type Name:");
-        if (!name) return;
-        await addLeaveType({ name });
-        dispatch(fetchGlobals());
-        const updated = await getLeaveTypes();
-        setLeaveTypes(Array.isArray(updated) ? updated : updated?.data || Object.values(updated || {}));
-
-    };
-
-    const handleUpdateLeaveType = async (type) => {
-        const newName = prompt("New name:", type.name);
-        if (!newName) return;
-        await updateLeaveType(type.id, { name: newName });
-        dispatch(fetchGlobals());
-        const updated = await getLeaveTypes();
-        setLeaveTypes(Array.isArray(updated) ? updated : updated?.data || Object.values(updated || {}));
-
-    };
-
-    const handleDeactivateLeaveType = async (type) => {
-        if (!window.confirm(`Deactivate ${type.name}?`)) return;
-        await deactivateLeaveType(type.id);
-        dispatch(fetchGlobals());
-        if (selectedType?.id === type.id) setSelectedType(null);
-        const updated = await getLeaveTypes();
-        setLeaveTypes(Array.isArray(updated) ? updated : updated?.data || Object.values(updated || {}));
-
-    };
-
-    const handleAddRule = async () => {
-        if (!selectedType) return alert("Select a leave type first!");
-        const ruleName = prompt("Enter rule name:");
-        if (!ruleName) return;
-        await addLeaveRule(selectedType.id, { ruleName });
-        await refreshRules(selectedType.id);
-        const updated = await getLeaveTypes();
-        setLeaveTypes(Array.isArray(updated) ? updated : updated?.data || Object.values(updated || {}));
-
-    };
-
-    const handleDeleteRule = async (rule) => {
-        await deleteLeaveRule(rule.id);
-        await refreshRules(selectedType.id);
-        const updated = await getLeaveTypes();
-        setLeaveTypes(Array.isArray(updated) ? updated : updated?.data || Object.values(updated || {}));
-
-    };
-
-    const handleAddCreditRule = async () => {
-        if (!selectedType) return alert("Select a leave type first!");
-        const name = prompt("Credit rule name:");
-        if (!name) return;
-        await addCreditRule(selectedType.id, { name });
-        await refreshRules(selectedType.id);
-        const updated = await getLeaveTypes();
-        setLeaveTypes(Array.isArray(updated) ? updated : updated?.data || Object.values(updated || {}));
-
-    };
-
-    const handleDeleteCreditRule = async (rule) => {
-        await deleteCreditRule(rule.id);
-        await refreshRules(selectedType.id);
-        const updated = await getLeaveTypes();
-        setLeaveTypes(Array.isArray(updated) ? updated : updated?.data || Object.values(updated || {}));
-
-    };
-
-    // Formatters
-    const formatKey = (key) =>
-        key
-            .replace(/_/g, " ")
-            .replace(/\b\w/g, (ch) => ch.toUpperCase());
-
-    const formatValue = (val) => {
-        if (val === null || val === undefined || val === "") return "—";
-        if (typeof val === "boolean") return val ? "Yes" : "No";
-        if (typeof val === "object") return JSON.stringify(val);
-        return String(val);
-    };
-
-    const HIDDEN_KEYS = new Set([
-        "id",
-        "leave_type_id",
-        "leaveTypeId",
-        "created_at",
-        "updated_at",
-        "deleted_at",
-    ]);
-
-    const renderRuleBlock = (title, items, onAdd, onDelete) => (
-        <div className="mt-6">
-            <h3 className="font-semibold text-lg mb-1">{title}</h3>
-            <ul className="border rounded-md divide-y">
-                {items.length === 0 ? (
-                    <p className="text-gray-400 italic p-2">No {title.toLowerCase()} defined</p>
-                ) : (
-                    items.map((rule) => (
-                        <li
-                            key={`${title}-${rule.id}`}
-                            className="p-3 flex justify-between items-start hover:bg-gray-50 rounded-md"
-                        >
-                            <div className="flex-1">
-                                <p className="font-medium mb-2">
-                                    {rule.ruleName || rule.name || `#${rule.id}`}
-                                </p>
-                                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm text-gray-700">
-                                    {Object.entries(rule)
-                                        .filter(([k]) => !HIDDEN_KEYS.has(k))
-                                        .map(([k, v]) => (
-                                            <div key={`${rule.id}-${k}`}>
-                                                <span className="font-medium">{formatKey(k)}:</span>{" "}
-                                                {formatValue(v)}
-                                            </div>
-                                        ))}
-                                </div>
-                            </div>
-                            <button
-                                onClick={() => onDelete(rule)}
-                                className="text-red-600 text-sm ml-3"
-                            >
-                                Delete
-                            </button>
-                        </li>
-                    ))
-                )}
-            </ul>
-            <button
-                onClick={onAdd}
-                className="mt-2 text-sm bg-blue-600 text-white px-3 py-1 rounded-md"
-            >
-                + Add {title}
-            </button>
-        </div>
-    );
 
     return (
-        <div className="flex gap-6 p-6">
-            {/* LEFT: Leave Types List */}
-            <div className="w-1/3 bg-white rounded-2xl shadow p-4">
-                <div className="flex justify-between items-center mb-3">
-                    <h2 className="text-lg font-bold">Leave Types</h2>
+        <div className="p-6 space-y-6">
+            <h2 className="text-2xl font-semibold">Leave Type Management</h2>
+
+            {/* Add Leave Type */}
+            <div className="border p-3 rounded-xl">
+                <h3 className="font-semibold mb-2">Add Leave Type</h3>
+                <form onSubmit={handleAddLeaveType} className="flex gap-2">
+                    <input
+                        type="text"
+                        placeholder="Leave Type Name"
+                        value={newLeaveType.name}
+                        onChange={(e) =>
+                            setNewLeaveType({ ...newLeaveType, name: e.target.value })
+                        }
+                        className="border p-2 rounded w-60"
+                    />
+                    <input
+                        type="number"
+                        placeholder="Default Balance"
+                        value={newLeaveType.defaultBalance}
+                        onChange={(e) =>
+                            setNewLeaveType({
+                                ...newLeaveType,
+                                defaultBalance: e.target.value,
+                            })
+                        }
+                        className="border p-2 rounded w-40"
+                    />
                     <button
-                        onClick={handleAddLeaveType}
-                        className="px-3 py-1 bg-blue-600 text-white rounded-md"
+                        type="submit"
+                        className="bg-blue-600 text-white px-4 rounded"
                     >
-                        + Add
+                        Add
                     </button>
-                </div>
-                <ul className="divide-y">
-                    {leaveTypes.map((lt) => (
-                        <li
-                            key={lt.id}
-                            onClick={() => handleSelectType(lt)}
-                            className={`p-3 cursor-pointer hover:bg-gray-50 ${selectedType?.id === lt.id ? "bg-blue-50" : ""
-                                }`}
-                        >
-                            <div className="flex justify-between items-center">
-                                <div>
-                                    <p className="font-medium">{lt.name}</p>
-                                    <p className="text-sm text-gray-500">
-                                        {lt.acronym || "—"} | Balance: {lt.defaultBalance ?? "—"}
-                                    </p>
-                                </div>
-                                <div className="flex gap-2">
-                                    <button
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleUpdateLeaveType(lt);
-                                        }}
-                                        className="text-blue-600 text-sm"
-                                    >
-                                        Edit
-                                    </button>
-                                    <button
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleDeactivateLeaveType(lt);
-                                        }}
-                                        className="text-red-600 text-sm"
-                                    >
-                                        ✕
-                                    </button>
-                                </div>
-                            </div>
-                        </li>
-                    ))}
-                </ul>
+                </form>
             </div>
 
-            {/* RIGHT: Rules + Credit Rules */}
-            <div className="flex-1 bg-white rounded-2xl shadow p-6">
-                {!selectedType ? (
-                    <p className="text-gray-500">Select a leave type to view details.</p>
-                ) : loading ? (
-                    <p className="text-gray-500 italic">Loading rules...</p>
-                ) : (
-                    <>
-                        <h2 className="text-xl font-bold mb-2">
-                            {selectedType.name} ({selectedType.acronym || "—"})
-                        </h2>
-                        {renderRuleBlock("Rule", rules, handleAddRule, handleDeleteRule)}
-                        {renderRuleBlock(
-                            "Credit Rule",
-                            creditRules,
-                            handleAddCreditRule,
-                            handleDeleteCreditRule
-                        )}
-                    </>
-                )}
+            {/* Leave Types List */}
+            <div>
+                <h3 className="font-semibold mb-2">All Leave Types</h3>
+                <div className="flex flex-wrap gap-2">
+                    {Object.entries(leaveTypes || {}).map(([key, lt]) => (
+                        <button
+                            key={key}
+                            onClick={() => handleSelectLeaveType({ ...lt, key })}
+                            className={`px-3 py-2 border rounded-lg ${selectedLeaveType?.key === key
+                                ? "bg-blue-600 text-white"
+                                : "bg-white"
+                                }`}
+                        >
+                            {lt.fullName}
+                        </button>
+                    ))}
+                </div>
             </div>
+
+            {/* Selected Leave Type Rules */}
+            {selectedLeaveType && (
+                <div className="mt-6">
+                    <h3 className="text-xl font-semibold mb-3">
+                        Rules for: {selectedLeaveType.fullName}
+                    </h3>
+
+                    {/* Leave Rules */}
+                    <div className="border p-4 rounded-xl mb-6">
+                        <h4 className="font-semibold mb-2">Leave Rules</h4>
+                        {leaveRules.map((rule) => (
+                            <div
+                                key={rule.id}
+                                className="border p-3 rounded-lg mb-2 bg-gray-50"
+                            >
+                                <div className="flex justify-between items-center">
+                                    <span className="font-medium">Rule ID: {rule.id}</span>
+                                    <button
+                                        className="text-sm bg-green-600 text-white px-2 py-1 rounded"
+                                        onClick={() => handleSaveRule(rule, "leave")}
+                                    >
+                                        Save
+                                    </button>
+                                </div>
+                                {Object.entries(rule).map(([field, value]) =>
+                                    ["id", "leave_type_id", "createdAt", "updatedAt"].includes(
+                                        field
+                                    ) ? null : (
+                                        <div key={field} className="mt-1 flex items-center gap-2">
+                                            <label className="w-48 text-sm text-gray-700">
+                                                {field}
+                                            </label>
+                                            <input
+                                                className="border p-1 rounded w-64"
+                                                value={value ?? ""}
+                                                onChange={(e) =>
+                                                    handleRuleChange(
+                                                        leaveRules,
+                                                        setLeaveRules,
+                                                        rule.id,
+                                                        field,
+                                                        e.target.value
+                                                    )
+                                                }
+                                            />
+                                        </div>
+                                    )
+                                )}
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* Credit Rules */}
+                    <div className="border p-4 rounded-xl">
+                        <h4 className="font-semibold mb-2">Credit Rules</h4>
+                        {creditRules.map((rule) => (
+                            <div
+                                key={rule.id}
+                                className="border p-3 rounded-lg mb-2 bg-gray-50"
+                            >
+                                <div className="flex justify-between items-center">
+                                    <span className="font-medium">Rule ID: {rule.id}</span>
+                                    <button
+                                        className="text-sm bg-green-600 text-white px-2 py-1 rounded"
+                                        onClick={() => handleSaveRule(rule, "credit")}
+                                    >
+                                        Save
+                                    </button>
+                                </div>
+                                {Object.entries(rule).map(([field, value]) =>
+                                    ["id", "leave_type_id", "createdAt", "updatedAt"].includes(
+                                        field
+                                    ) ? null : (
+                                        <div key={field} className="mt-1 flex items-center gap-2">
+                                            <label className="w-48 text-sm text-gray-700">
+                                                {field}
+                                            </label>
+                                            <input
+                                                className="border p-1 rounded w-64"
+                                                value={value ?? ""}
+                                                onChange={(e) =>
+                                                    handleRuleChange(
+                                                        creditRules,
+                                                        setCreditRules,
+                                                        rule.id,
+                                                        field,
+                                                        e.target.type === "number" ? Number(e.target.value) : e.target.value
+                                                    )
+                                                }
+                                            />
+                                        </div>
+                                    )
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
