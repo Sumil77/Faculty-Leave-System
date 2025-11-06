@@ -1,6 +1,5 @@
 import { DataTypes, Model } from "sequelize";
 import { sequelize } from "../config.js";
-import User from "./user.js";
 
 class LeaveApproved extends Model {
   static async doesNotExist(field) {
@@ -35,9 +34,9 @@ LeaveApproved.init(
       type: DataTypes.ENUM("full", "half", "quarter"), // ✅ new field
       defaultValue: "full",
     },
-    leaveType: {
-      type: DataTypes.STRING,
-      allowNull: false,
+    leave_type_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
     },
     dept: {
       type: DataTypes.STRING,

@@ -1,10 +1,12 @@
 'use strict';
 
 export async function up(queryInterface, Sequelize) {
+  // ✅ Fetch all leave types
   const [leaveTypes] = await queryInterface.sequelize.query(
     `SELECT "id", "name" FROM "LeaveTypes";`
   );
 
+  // ✅ Generate rule entries based on leave types
   const rules = leaveTypes.map((type) => ({
     leave_type_id: type.id,
     max_days_per_request:
@@ -23,9 +25,10 @@ export async function up(queryInterface, Sequelize) {
     allow_half_day: ["casual", "medical", "earned"].includes(type.name),
     allow_quarter_day: type.name === "casual",
     require_prior_approval: true,
-    reason_required: true,
+    reason_required: ["medical", "maternity"].includes(type.name),
     attachment_required: ["medical", "maternity"].includes(type.name),
     active: true,
+    isPaid: true,
     createdAt: new Date(),
     updatedAt: new Date(),
   }));

@@ -1,8 +1,6 @@
 // src/models/LeaveBalance.js
 import { DataTypes, Model } from "sequelize";
 import { sequelize } from "../config.js";
-import User from "./user.js";
-import LeaveType from "./leaveType.js"
 
 class LeaveBalance_normalized extends Model {}
 
@@ -28,7 +26,5 @@ LeaveBalance_normalized.init(
   }
 );
 
-LeaveBalance_normalized.belongsTo(User, { foreignKey: "user_id" });
-LeaveBalance_normalized.belongsTo(LeaveType, { foreignKey: "leave_type_id" });
 
 export default LeaveBalance_normalized;

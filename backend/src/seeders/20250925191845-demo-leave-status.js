@@ -1,19 +1,27 @@
 import { faker } from "@faker-js/faker";
-import { defaultLeaveTypes } from "../validators/leaveValidations.js";
 
 export async function up(queryInterface, Sequelize) {
   const pending = [];
   const approved = [];
   const rejected = [];
-
-  const leaveKeys = Object.keys(defaultLeaveTypes);
   let globalId = 21;
 
-  // Fetch all users except system one
+  // Fetch users (excluding system)
   const users = await queryInterface.sequelize.query(
     `SELECT user_id, dept FROM "User" WHERE user_id <> 123;`,
     { type: queryInterface.sequelize.QueryTypes.SELECT }
   );
+
+  // Fetch leave types with IDs
+  const leaveTypes = await queryInterface.sequelize.query(
+    `SELECT id, name FROM "LeaveTypes";`,
+    { type: queryInterface.sequelize.QueryTypes.SELECT }
+  );
+
+  if (!users.length || !leaveTypes.length) {
+    console.warn("⚠️ No users or leave types found. Seeder skipped.");
+    return;
+  }
 
   for (const user of users) {
     const numLeaves = faker.number.int({ min: 1, max: 5 });
@@ -23,15 +31,13 @@ export async function up(queryInterface, Sequelize) {
       const to = new Date(from);
       to.setDate(to.getDate() + faker.number.int({ min: 0, max: 5 }));
 
-      const leaveKey = faker.helpers.arrayElement(leaveKeys);
+      const selectedType = faker.helpers.arrayElement(leaveTypes);
       const fraction = faker.helpers.arrayElement(["full", "half", "quarter"]);
 
-      // compute totalDays based on fraction
+      // total days logic
       const baseDays = Math.ceil((to - from) / (1000 * 60 * 60 * 24)) + 1;
-      let fractionMultiplier = 1;
-      if (fraction === "half") fractionMultiplier = 0.5;
-      else if (fraction === "quarter") fractionMultiplier = 0.25;
-
+      const fractionMultiplier =
+        fraction === "half" ? 0.5 : fraction === "quarter" ? 0.25 : 1;
       const totalDays = parseFloat((baseDays * fractionMultiplier).toFixed(2));
 
       const appliedOn = faker.date.between({
@@ -42,12 +48,12 @@ export async function up(queryInterface, Sequelize) {
       const leaveObj = {
         id: globalId++,
         user_id: user.user_id,
+        leave_type_id: selectedType.id,
         appliedOn,
         fromDate: from,
         toDate: to,
         totalDays,
         fraction,
-        leaveType: leaveKey,
         dept: user.dept,
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -58,6 +64,7 @@ export async function up(queryInterface, Sequelize) {
         "approved",
         "rejected",
       ]);
+
       if (state === "pending") pending.push(leaveObj);
       else if (state === "approved") approved.push(leaveObj);
       else rejected.push(leaveObj);
@@ -67,6 +74,10 @@ export async function up(queryInterface, Sequelize) {
   await queryInterface.bulkInsert("LeavePending", pending);
   await queryInterface.bulkInsert("LeaveApproved", approved);
   await queryInterface.bulkInsert("LeaveRejected", rejected);
+
+  console.log(
+    `✅ Inserted mock leaves: Pending=${pending.length}, Approved=${approved.length}, Rejected=${rejected.length}`
+  );
 }
 
 export async function down(queryInterface, Sequelize) {

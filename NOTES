@@ -1,0 +1,5 @@
+07/11/25 - 
+added leave_type_id to all tables, some it need to be taken care of everywhere
+frontend - redux has things already, but POST functions need to be taken care of
+backend - api responses need not be changed due to redux having what we need for old response compatibility
+leave_type doc from sirji also need to be taken care of

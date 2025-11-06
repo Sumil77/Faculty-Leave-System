@@ -28,7 +28,9 @@ export async function evaluateLeaveRequest(
   leaveTypeId,
   requestedDays,
   isHalfDay = false,
-  requestDate = new Date()
+  requestDate = new Date(),
+  reason = null,
+  attachemnt = null
 ) {
   const rules = await getLeaveRules();
   const rule = rules.find((r) => r.leave_type_id === leaveTypeId);
@@ -95,7 +97,7 @@ export async function evaluateLeaveRequest(
   // 7. Require prior approval or apply-before-days
   if (rule.apply_before_days) {
     const diffDays = Math.ceil(
-      (new Date(requestDate) - new Date()) / (1000 * 60 * 60 * 24)
+      (new Date(requestDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
     );
     if (diffDays < rule.apply_before_days)
       return fail(
@@ -104,9 +106,9 @@ export async function evaluateLeaveRequest(
   }
 
   // 8. Miscellaneous
-  if (rule.reason_required && !user.reason)
+  if (rule.reason_required && !reason)
     return fail(`Reason is mandatory for this leave.`);
-  if (rule.attachment_required && !user.attachment)
+  if (rule.attachment_required && !attachment)
     return fail(`Attachment required for this leave.`);
 
   return { valid: true };

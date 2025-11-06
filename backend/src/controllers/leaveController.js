@@ -60,6 +60,7 @@ export const getLeaveRejected = async (req, res) => {
     where: { user_id },
     limit,
     offset,
+
   });
 
   const totalPages = Math.ceil(totalEntries / limit);
@@ -88,6 +89,7 @@ export const getLeavePending = async (req, res) => {
     where: { user_id },
     limit,
     offset,
+
   });
 
   const totalPages = Math.ceil(totalEntries / limit);
@@ -135,7 +137,7 @@ export const getLeave = async (req, res) => {
       ),
       "appliedOnIST",
     ], // Convert to IST
-    "leaveType",
+    "leave_type_id",
     "fromDate",
     "toDate",
     "id",
@@ -159,7 +161,7 @@ export const getLeave = async (req, res) => {
     if (status === "Pending") {
       totalEntries = await LeavePending.count({ where: whereClause });
       data = await LeavePending.findAll({
-        where: whereClause,
+        where :  whereClause,  
         attributes: attrList,
         order: orderBy,
         limit: limit,
@@ -176,7 +178,7 @@ export const getLeave = async (req, res) => {
       });
     } else if (status === "Rejected") {
       totalEntries = await LeaveRejected.count({ where: whereClause });
-      data = await LeavePending.findAll({
+      data = await LeaveRejected.findAll({
         where: whereClause,
         attributes: attrList,
         order: orderBy,
@@ -223,7 +225,6 @@ export const getLeaveBalanceV2 = async (req, res) => {
 
   const balances = await LeaveBalance_normalized.findAll({
     where: { user_id },
-    include: [{ model: LeaveType, attributes: ["name"] }],
     raw: true,
   });
 

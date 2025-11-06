@@ -123,6 +123,7 @@ export const getReportSummary = async (req, res) => {
   }
 };
 
+
 export const getLeaveSummary = async (req, res) => {
   try {
     const {
@@ -130,7 +131,7 @@ export const getLeaveSummary = async (req, res) => {
       dept,
       from,
       to,
-      leave_type,
+      leave_type_id, // updated: expects an integer ID now
       order_by = "user_id",
       page = 1,
       limit = 20,
@@ -140,7 +141,7 @@ export const getLeaveSummary = async (req, res) => {
 
     const result = await sequelize.query(
       `SELECT get_dynamic_leave_summary(
-        :user_id, :dept, :from, :to, :leave_type, :order_by, :limit, :offset
+        :user_id, :dept, :from, :to, :leave_type_id, :order_by, :limit, :offset
       ) AS data`,
       {
         replacements: {
@@ -148,18 +149,17 @@ export const getLeaveSummary = async (req, res) => {
           dept: dept || null,
           from: from || null,
           to: to || null,
-          leave_type: leave_type || null,
+          leave_type_id: leave_type_id ? Number(leave_type_id) : null,
           order_by,
-          limit,
-          offset,
+          limit: Number(limit),
+          offset: Number(offset),
         },
         type: QueryTypes.SELECT,
       }
     );
 
-    // DB function now returns { totalCount, rows }
+    // DB function returns { totalCount, rows }
     const { totalCount = 0, rows = [] } = result[0].data || {};
-    console.log(rows);
 
     res.json({
       page: Number(page),
@@ -180,7 +180,7 @@ export const getLeaveHistory = async (req, res) => {
       dept,
       from,
       to,
-      leave_type,
+      leave_type_id, // updated: integer ID now
       order_by = "user_id",
       page = 1,
       limit = 20,
@@ -191,7 +191,7 @@ export const getLeaveHistory = async (req, res) => {
 
     const result = await sequelize.query(
       `SELECT get_leave_history_json(
-        :user_ids, :dept, :from, :to, :leave_type, :order_by, :limit, :offset
+        :user_ids, :dept, :from, :to, :leave_type_id, :order_by, :limit, :offset
       ) AS data`,
       {
         replacements: {
@@ -199,17 +199,16 @@ export const getLeaveHistory = async (req, res) => {
           dept: dept || null,
           from: from || null,
           to: to || null,
-          leave_type: leave_type || null,
+          leave_type_id: leave_type_id ? Number(leave_type_id) : null,
           order_by,
-          limit,
-          offset,
+          limit: Number(limit),
+          offset: Number(offset),
         },
         type: QueryTypes.SELECT,
       }
     );
 
     const { totalCount = 0, rows = [] } = result[0].data || {};
-    console.log(rows);
 
     res.json({
       page: Number(page),

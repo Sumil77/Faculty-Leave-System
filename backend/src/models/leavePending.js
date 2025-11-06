@@ -1,6 +1,5 @@
 import { DataTypes, Model } from "sequelize";
 import { sequelize } from "../config.js"; // your sequelize instance
-import User from "./user.js";
 
 class LeavePending extends Model {
   // Static method to check field uniqueness
@@ -32,9 +31,9 @@ LeavePending.init(
       type: DataTypes.DECIMAL(4, 2), // e.g., 0.25, 1.00, 15.75 etc.
       allowNull: false,
     },
-    leaveType: {
-      type: DataTypes.STRING,
-      allowNull: false,
+    leave_type_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
     },
     dept: {
       type: DataTypes.STRING,

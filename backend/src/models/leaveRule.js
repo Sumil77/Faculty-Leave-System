@@ -45,6 +45,10 @@ LeaveRule.init(
       type: DataTypes.BOOLEAN,
       defaultValue: true,
     },
+    noticePeriodRequired: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+    },
     min_service_months: DataTypes.INTEGER,
     holiday_included: {
       type: DataTypes.BOOLEAN,
@@ -88,6 +92,10 @@ LeaveRule.init(
       defaultValue: false,
     },
     active: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: true,
+    },
+    isPaid: {
       type: DataTypes.BOOLEAN,
       defaultValue: true,
     },

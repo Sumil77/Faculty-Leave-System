@@ -2,73 +2,59 @@ import { sequelize } from "../config.js";
 
 // Import all seeders
 import * as userSeeder from "./20250925190229-demo-users.js";
-import * as adminSeeder from "./20250925190230-demo-admins.js";
-import * as leaveBalanceSeeder from "./20250925190231-demo-leave-balance.js";
-import * as leaveTakenSeeder from "./20250925190236-demo-leave-taken.js";
 import * as credentialsSeeder from "./20250925191610-demo-credentials.js";
-import * as leaveStatusSeeder from "./20250925191845-demo-leave-status.js";
+import * as adminSeeder from "./20250925190230-demo-admins.js";
+import * as leaveTypeSeeder from "./2025102801-seed-leave-types.js";
 import * as leaveRuleSeeder from "./2025102802-seed-leave-rules.js";
 import * as leaveCreditRuleSeeder from "./2025102803-seed-leave-credit-rules.js";
-import * as leaveTypeSeeder from "./2025102801-seed-leave-types.js";
-
-// Main seeding function
+import * as leaveBalanceSeeder from "./20250925190231-demo-leave-balance.js";
+import * as leaveTakenSeeder from "./20250925190236-demo-leave-taken.js";
+import * as leaveBalanceNormalizedSeeder from "./2025110701-seed-leave-balance-normalized.js"; // new
+import * as leaveStatusSeeder from "./20250925191845-demo-leave-status.js";
 
 async function seedAll() {
   try {
-    console.log("Starting database seeding...");
+    console.log("🚀 Starting database seeding...");
 
     const queryInterface = sequelize.getQueryInterface();
     const SequelizeClass = sequelize.constructor;
 
-    // Helper to run seeder safely
     async function runSeederSafely(seeder, tableName) {
-      console.log(`Seeding ${tableName}...`);
-      // Read all existing IDs/emails for that table
-      const [existingRows] = await sequelize.query(
-        `SELECT * FROM "${tableName}";`
-      );
-      const existingIds = new Set(existingRows.map((r) => r.user_id || r.id));
+      console.log(`🌱 Seeding ${tableName}...`);
 
-      // Monkey patch queryInterface.bulkInsert to skip duplicates
-      const originalBulkInsert = queryInterface.bulkInsert.bind(queryInterface);
-      queryInterface.bulkInsert = async (tbl, records, options) => {
-        const filtered = records.filter((r) => !existingIds.has(r.user_id));
-        if (filtered.length > 0) {
-          await originalBulkInsert(tbl, filtered, options);
-        } else {
-          console.log(`✅ No new ${tableName} to insert.`);
-        }
-      };
-
-      await seeder.up(queryInterface, SequelizeClass);
-
-      // Restore original
-      queryInterface.bulkInsert = originalBulkInsert;
+      try {
+        await seeder.up(queryInterface, SequelizeClass);
+        console.log(`✅ ${tableName} seeded successfully.`);
+      } catch (err) {
+        console.warn(`⚠️ Skipped ${tableName}:`, err.message);
+      }
     }
 
+    // 🧩 ORDER MATTERS
+    // 1️⃣ Core entities
     await runSeederSafely(userSeeder, "User");
-    await runSeederSafely(adminSeeder, "Admins");
     await runSeederSafely(credentialsSeeder, "Credentials");
-    await runSeederSafely(leaveBalanceSeeder, "LeaveBalance");
-    await runSeederSafely(leaveTakenSeeder, "LeaveTaken");
-    await leaveStatusSeeder.up(
-      sequelize.getQueryInterface(),
-      sequelize.constructor
-    );
-    await leaveTypeSeeder.up(
-      sequelize.getQueryInterface(),
-      sequelize.constructor
-    );
-    await leaveRuleSeeder.up(
-      sequelize.getQueryInterface(),
-      sequelize.constructor
-    );
-    await leaveCreditRuleSeeder.up(
-      sequelize.getQueryInterface(),
-      sequelize.constructor
-    );
+    await runSeederSafely(adminSeeder, "Admins");
 
-    console.log("✅ All seeders executed safely!");
+    // 2️⃣ Leave base types
+    await runSeederSafely(leaveTypeSeeder, "LeaveTypes");
+
+    // 3️⃣ Rules tied to LeaveTypes
+    await runSeederSafely(leaveRuleSeeder, "leave_rules");
+    await runSeederSafely(leaveCreditRuleSeeder, "leave_credit_rules");
+
+    // 4️⃣ Balances & Taken leaves tied to Users + LeaveTypes
+    await runSeederSafely(leaveBalanceSeeder, "LeaveBalance");
+    await runSeederSafely(
+      leaveBalanceNormalizedSeeder,
+      "LeaveBalances_normalized"
+    );
+    await runSeederSafely(leaveTakenSeeder, "LeaveTaken");
+
+    // 5️⃣ Leave requests (Pending/Approved/Rejected)
+    await leaveStatusSeeder.up(queryInterface, SequelizeClass);
+
+    console.log("🎉 All seeders executed successfully!");
     process.exit(0);
   } catch (err) {
     console.error("❌ Error during seeding:", err);

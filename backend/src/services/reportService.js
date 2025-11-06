@@ -26,7 +26,7 @@ export async function getHistory(filters = {}) {
       dept = null,
       from = null,
       to = null,
-      leaveType = null,
+      leave_type_id = null, // updated: integer ID
       orderBy = "user_id",
       limit = 20,
       offset = 0,
@@ -38,7 +38,7 @@ export async function getHistory(filters = {}) {
          :dept::text,
          :from::date,
          :to::date,
-         :leave_type::text,
+         :leave_type_id::int,
          :order_by::text,
          :limit,
          :offset
@@ -49,7 +49,7 @@ export async function getHistory(filters = {}) {
           dept,
           from,
           to,
-          leave_type: leaveType,
+          leave_type_id,
           order_by: orderBy,
           limit,
           offset,
@@ -78,7 +78,7 @@ export async function getHistoryForMail(filters = {}) {
       dept = null,
       from = null,
       to = null,
-      leaveType = null,
+      leave_type_id = null, // updated to integer ID
       orderBy = "user_id",
     } = filters;
 
@@ -90,7 +90,7 @@ export async function getHistoryForMail(filters = {}) {
          :dept::text,
          :from::date,
          :to::date,
-         :leave_type::text,
+         :leave_type_id::int,
          :order_by::text,
          :limit,
          :offset
@@ -101,7 +101,7 @@ export async function getHistoryForMail(filters = {}) {
           dept,
           from,
           to,
-          leave_type: leaveType,
+          leave_type_id,
           order_by: orderBy,
           limit: MAX_ROWS,
           offset: 0,
@@ -337,7 +337,7 @@ export async function getSummary(filters = {}) {
       dept = null,
       from = null,
       to = null,
-      leaveType = null,
+      leave_type_id = null, // updated to integer
       orderBy = "user_id",
       limit = 20,
       offset = 0,
@@ -349,8 +349,8 @@ export async function getSummary(filters = {}) {
           :dept::text,
           :from_date::date,
           :to_date::date,
-          :leaveType::text,
-          :orderBy::text,
+          :leave_type_id::int,
+          :order_by::text,
           :limit,
           :offset
        ) AS data`,
@@ -360,8 +360,8 @@ export async function getSummary(filters = {}) {
           dept,
           from_date: from,
           to_date: to,
-          leaveType,
-          orderBy,
+          leave_type_id,
+          order_by: orderBy,
           limit,
           offset,
         },
@@ -393,7 +393,7 @@ export async function getSummaryForMail(filters = {}) {
       dept = null,
       from = null,
       to = null,
-      leaveType = null,
+      leave_type_id = null, // updated to integer
       orderBy = "user_id",
     } = filters;
 
@@ -404,8 +404,8 @@ export async function getSummaryForMail(filters = {}) {
       dept: dept ?? null,
       from_date: from ?? null,
       to_date: to ?? null,
-      leaveType: leaveType ?? null,
-      orderBy: orderBy ?? "user_id",
+      leave_type_id: leave_type_id ?? null, // updated
+      order_by: orderBy ?? "user_id",
       limit: MAX_ROWS,
       offset: 0,
     };
@@ -417,8 +417,8 @@ export async function getSummaryForMail(filters = {}) {
         :dept::text,
         :from_date::date,
         :to_date::date,
-        :leaveType::text,
-        :orderBy::text,
+        :leave_type_id::int,
+        :order_by::text,
         :limit,
         :offset
       ) AS data;
@@ -430,7 +430,7 @@ export async function getSummaryForMail(filters = {}) {
     );
 
     if (!result?.[0]?.data) {
-      return { rows: [], analytics: {} };
+      return { rows: [], analytics: {}, totalCount: 0 };
     }
 
     const summary =
@@ -438,15 +438,20 @@ export async function getSummaryForMail(filters = {}) {
         ? JSON.parse(result[0].data)
         : result[0].data;
 
-    // 🩵 Ensure numeric totals
+    // 🩵 Ensure numeric totals (optional, if you have numeric columns per leave type)
     if (summary?.rows?.length) {
-      summary.rows = summary.rows.map((row) => ({
-        ...row,
-        totalDays: parseFloat(Number(row.totalDays).toFixed(2)) || 0,
-      }));
+      summary.rows = summary.rows.map((row) => {
+        const newRow = { ...row };
+        for (const key in newRow) {
+          if (typeof newRow[key] === "number" || !isNaN(Number(newRow[key]))) {
+            newRow[key] = parseFloat(Number(newRow[key]).toFixed(2));
+          }
+        }
+        return newRow;
+      });
     }
 
-    // 🩵 Return both rows + analytics for PDF
+    // 🩵 Return rows + analytics
     return {
       rows: summary?.rows || [],
       analytics: summary?.analytics || {},

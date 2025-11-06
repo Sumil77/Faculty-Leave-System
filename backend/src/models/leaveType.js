@@ -16,6 +16,11 @@ LeaveType.init(
       allowNull: false,
       unique: true,
     },
+    fullName:{
+      type: DataTypes.STRING,
+      allowNull: true,
+      unique: true,
+    },
     acronym: {
       type: DataTypes.STRING,
       allowNull: false,
@@ -23,42 +28,6 @@ LeaveType.init(
     },
     description: {
       type: DataTypes.STRING,
-    },
-    maxDaysPerMonth: {
-      type: DataTypes.INTEGER,
-      allowNull: true,
-    },
-    maxDaysPerYear: {
-      type: DataTypes.INTEGER,
-      allowNull: true,
-    },
-    carryForward: {
-      type: DataTypes.BOOLEAN,
-      defaultValue: false,
-    },
-    requiresDocument: {
-      type: DataTypes.BOOLEAN,
-      defaultValue: false,
-    },
-    isPaid: {
-      type: DataTypes.BOOLEAN,
-      defaultValue: true,
-    },
-    genderSpecific: {
-      type: DataTypes.STRING,
-      allowNull: true, // 'M', 'F', or 'ANY'
-    },
-    minGapBetweenLeaves: {
-      type: DataTypes.INTEGER,
-      allowNull: true,
-    },
-    maxConsecutiveDays: {
-      type: DataTypes.INTEGER,
-      allowNull: true,
-    },
-    noticePeriodRequired: {
-      type: DataTypes.INTEGER,
-      allowNull: true,
     },
     active: {
       type: DataTypes.BOOLEAN,

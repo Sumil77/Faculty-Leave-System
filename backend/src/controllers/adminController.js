@@ -94,7 +94,9 @@ export const getRequests = async (req, res) => {
 
       const { rows, count } = await Model.findAndCountAll({
         where,
-        include: [{ model: User, as: "user", attributes: ["name"] }],
+        include: [
+          { model: User, as: "user", attributes: ["name"] },
+        ],
         limit: limitNum,
         offset,
         order: [[sortColumn, sortDirection]],
@@ -786,8 +788,6 @@ export const updateLeaveRule = async (req, res) => {
       return res.status(400).json({ error: error.message });
     }
 
-    
-
     const [updated] = await LeaveRule.update(req.body, {
       where: { id },
       transaction: t,
@@ -840,7 +840,6 @@ export const getCreditRules = async (req, res) => {
   try {
     const { leaveTypeId } = req.query;
     console.log(leaveTypeId);
-    
 
     const cached = await redis.get(CACHE_KEYS.CREDIT_RULES);
     if (cached) {
@@ -864,7 +863,7 @@ export const getCreditRules = async (req, res) => {
         )
       : await redis.set(CACHE_KEYS.CREDIT_RULES, JSON.stringify(creditRules));
 
-      console.log("Fetched Credit Rules:", creditRules);
+    console.log("Fetched Credit Rules:", creditRules);
     return res.json(creditRules);
   } catch (err) {
     console.error("getCreditRules:", err);

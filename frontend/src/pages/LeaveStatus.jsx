@@ -15,7 +15,7 @@ const LeaveStatus = () => {
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const leaveTypes = useSelector((state) => state.global.leaveTypes);
+  const leaveTypes = useSelector((state) => state.global.leaveTypes); // stored globally on login
 
   const loadLeaves = async () => {
     try {
@@ -44,21 +44,40 @@ const LeaveStatus = () => {
 
   useEffect(() => {
     loadLeaves();
-  }, [statusFilter, typeFilter, currentPage, entriesPerPage, dateField, startDate, endDate]);
+  }, [
+    statusFilter,
+    typeFilter,
+    currentPage,
+    entriesPerPage,
+    dateField,
+    startDate,
+    endDate,
+  ]);
 
   const handleSelectLeave = (id) => {
-    if (selectedLeaves.includes(id)) {
-      setSelectedLeaves(selectedLeaves.filter((leaveId) => leaveId !== id));
-    } else {
-      setSelectedLeaves([...selectedLeaves, id]);
+    setSelectedLeaves((prev) =>
+      prev.includes(id)
+        ? prev.filter((leaveId) => leaveId !== id)
+        : [...prev, id]
+    );
+  };
+
+  const handleCancelSelected = async () => {
+    if (selectedLeaves.length === 0) return;
+    try {
+      await leaveController.cancelLeaves(selectedLeaves);
+      setSelectedLeaves([]);
+      loadLeaves();
+    } catch (err) {
+      console.error("Failed to cancel leaves:", err);
     }
   };
 
-  const handleCancelSelected = () => {
-    if (selectedLeaves) {
-      leaveController.cancelLeaves(selectedLeaves);
-    }
-    setSelectedLeaves([]);
+  const getLeaveName = (id) => {
+    const type = Object.values(leaveTypes).find(
+      (t) => t.leaveTypeId === id
+    );
+    return type ? type.fullName : "Unknown";
   };
 
   return (
@@ -82,16 +101,15 @@ const LeaveStatus = () => {
         <select
           value={typeFilter}
           onChange={(e) => {
-            setTypeFilter(e.target.value)
+            setTypeFilter(e.target.value);
             setCurrentPage(1);
             setSelectedLeaves([]);
-          }
-          }
+          }}
           className="p-2 border rounded"
         >
           <option value="">Select Leave Type</option>
-          {Object.entries(leaveTypes).map(([key, type], idx) => (
-            <option key={idx} value={key}>
+          {Object.values(leaveTypes).map((type) => (
+            <option key={type.leaveTypeId} value={type.leaveTypeId}>
               {type.fullName}
             </option>
           ))}
@@ -116,22 +134,20 @@ const LeaveStatus = () => {
           className="p-2 border rounded"
           value={startDate}
           onChange={(e) => {
-            setStartDate(e.target.value)
+            setStartDate(e.target.value);
             setCurrentPage(1);
             setSelectedLeaves([]);
-          }
-          }
+          }}
         />
         <input
           type="date"
           className="p-2 border rounded"
           value={endDate}
           onChange={(e) => {
-            setEndDate(e.target.value)
+            setEndDate(e.target.value);
             setCurrentPage(1);
             setSelectedLeaves([]);
-          }
-          }
+          }}
         />
 
         <select
@@ -150,20 +166,18 @@ const LeaveStatus = () => {
       </div>
 
       {/* Cancel Button */}
-      {
-        statusFilter === "Pending" && (
-          <button
-            className={`mb-4 p-2 px-4 rounded ${selectedLeaves.length > 0
+      {statusFilter === "Pending" && (
+        <button
+          className={`mb-4 p-2 px-4 rounded ${selectedLeaves.length > 0
               ? "bg-red-500 hover:bg-red-600 text-white"
               : "bg-gray-400 cursor-not-allowed"
-              }`}
-            disabled={selectedLeaves.length === 0}
-            onClick={handleCancelSelected}
-          >
-            Cancel Selected Leaves
-          </button>
-        )
-      }
+            }`}
+          disabled={selectedLeaves.length === 0}
+          onClick={handleCancelSelected}
+        >
+          Cancel Selected Leaves
+        </button>
+      )}
 
       {/* Table */}
       <div className="overflow-x-auto">
@@ -176,7 +190,9 @@ const LeaveStatus = () => {
             <table className="w-full border-collapse">
               <thead className="sticky top-0 bg-gray-200 z-10">
                 <tr>
-                  {statusFilter === "Pending" && <th className="p-2 border bg-gray-200">Select</th>}
+                  {statusFilter === "Pending" && (
+                    <th className="p-2 border bg-gray-200">Select</th>
+                  )}
                   <th className="p-2 border bg-gray-200">Applied On</th>
                   <th className="p-2 border bg-gray-200">Type</th>
                   <th className="p-2 border bg-gray-200">From Date</th>
@@ -198,7 +214,9 @@ const LeaveStatus = () => {
                         </td>
                       )}
                       <td className="p-2 border">{leave.appliedOnIST}</td>
-                      <td className="p-2 border">{leaveController.leaveTypes[leave.leaveType].fullName}</td>
+                      <td className="p-2 border">
+                        {getLeaveName(leave.leave_type_id)}
+                      </td>
                       <td className="p-2 border">{leave.fromDate}</td>
                       <td className="p-2 border">{leave.toDate}</td>
                       <td className="p-2 border">{statusFilter}</td>
@@ -206,7 +224,10 @@ const LeaveStatus = () => {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={statusFilter === "Pending" ? 6 : 5} className="p-4">
+                    <td
+                      colSpan={statusFilter === "Pending" ? 6 : 5}
+                      className="p-4"
+                    >
                       No leaves found.
                     </td>
                   </tr>
@@ -214,11 +235,10 @@ const LeaveStatus = () => {
               </tbody>
             </table>
           </div>
-
         )}
       </div>
 
-      {/* Pagination Controls */}
+      {/* Pagination */}
       <div className="flex justify-between items-center mt-6">
         <button
           className="p-2 px-4 bg-blue-500 text-white rounded disabled:opacity-50"
@@ -227,7 +247,9 @@ const LeaveStatus = () => {
         >
           Prev
         </button>
-        <span>Page {currentPage} of {totalPages}</span>
+        <span>
+          Page {currentPage} of {totalPages}
+        </span>
         <button
           className="p-2 px-4 bg-blue-500 text-white rounded disabled:opacity-50"
           disabled={currentPage === totalPages}
@@ -236,7 +258,7 @@ const LeaveStatus = () => {
           Next
         </button>
       </div>
-    </div >
+    </div>
   );
 };
 

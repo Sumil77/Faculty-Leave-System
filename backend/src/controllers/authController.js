@@ -1,23 +1,23 @@
 import { signIn } from "../validators/userValidations.js";
 import { parseError } from "../controllers/userController.js";
 import { SESS_NAME } from "../config.js";
-import { Credentials, Admin } from "../models/index.js";
+import { Credentials, Admin, User } from "../models/index.js";
 
 import {
   getLeaveTypesV2,
   defaultLeaveTypes,
 } from "../validators/leaveValidations.js";
 
-const sessionizeUser = (cred) => {
-  /*const sessionizeUser = async (cred) => {
-    const isAdmin = await Admin.findOne({ where: { user_id: cred.user_id } });
-    return {
-      user_id: cred.user_id,
-      userName: cred.name,
-      dept: cred.dept,
-      isAdmin: !!isAdmin, // true if found
-    };
-  };*/
+const sessionizeUser = async (cred) => {
+  // const userMetaData = await User.findOne({ where: { user_id: cred.user_id } });
+  // const isAdmin = await Admin.findOne({ where: { user_id: cred.user_id } });
+  // return {
+  //   user_id: cred.user_id,
+  //   userName: cred.name,
+  //   dept: cred.dept,
+  //   isAdmin: !!isAdmin, // true if found
+  //   ...userMetaData?.dataValues,
+  // };
 
   return { user_id: 123, userName: "sumil", dept: "CSE", isAdmin: true };
 };

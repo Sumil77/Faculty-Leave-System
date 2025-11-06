@@ -22,11 +22,11 @@ LeaveBalance.belongsTo(User, {
   as: "user",
 });
 
-LeavePending.belongsTo(LeaveType, { foreignKey: "leaveTypeId" });
-LeaveApproved.belongsTo(LeaveType, { foreignKey: "leaveTypeId" });
-LeaveRejected.belongsTo(LeaveType, { foreignKey: "leaveTypeId" });
-LeaveTaken.belongsTo(LeaveType, { foreignKey: "leaveTypeId" });
-LeaveBalance.belongsTo(LeaveType, { foreignKey: "leaveTypeId" });
+LeavePending.belongsTo(LeaveType, { foreignKey: "leave_type_id" , as: "leaveType"});
+LeaveApproved.belongsTo(LeaveType, { foreignKey: "leave_type_id" , as: "leaveType"});
+LeaveRejected.belongsTo(LeaveType, { foreignKey: "leave_type_id" , as: "leaveType"});
+LeaveTaken.belongsTo(LeaveType, { foreignKey: "leave_type_id" , as: "leaveType"});
+LeaveBalance.belongsTo(LeaveType, { foreignKey: "leave_type_id" , as: "leaveType"});
 LeaveTaken.belongsTo(User, {
   foreignKey: "user_id",
   targetKey: "user_id",
@@ -43,11 +43,14 @@ User.hasMany(CompensatoryLeave, {
 User.hasOne(LeaveBalance, { foreignKey: "user_id", as: "balanceLeaves" });
 User.hasOne(LeaveTaken, { foreignKey: "user_id", as: "takenLeaves" });
 
-LeaveType.hasMany(LeaveBalance, { foreignKey: "leaveTypeId" });
-LeaveType.hasMany(LeavePending, { foreignKey: "leaveTypeId" });
-LeaveType.hasMany(LeaveApproved, { foreignKey: "leaveTypeId" });
-LeaveType.hasMany(LeaveRejected, { foreignKey: "leaveTypeId" });
-LeaveType.hasMany(LeaveTaken, { foreignKey: "leaveTypeId" });
+LeaveType.hasMany(LeaveBalance, { foreignKey: "leave_type_id" });
+LeaveType.hasMany(LeavePending, { foreignKey: "leave_type_id" });
+LeaveType.hasMany(LeaveApproved, { foreignKey: "leave_type_id" });
+LeaveType.hasMany(LeaveRejected, { foreignKey: "leave_type_id" });
+LeaveType.hasMany(LeaveTaken, { foreignKey: "leave_type_id" });
+
+LeaveRule.belongsTo(LeaveType, { foreignKey: "leave_type_id" });
+LeaveCreditRule.belongsTo(LeaveType, { foreignKey: "leave_type_id" });
 
 LeaveBalance_normalized.belongsTo(User, { foreignKey: "user_id" });
 LeaveBalance_normalized.belongsTo(LeaveType, { foreignKey: "leave_type_id" });

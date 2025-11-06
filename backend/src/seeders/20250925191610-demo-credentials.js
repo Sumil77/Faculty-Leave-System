@@ -10,7 +10,7 @@ export async function up(queryInterface, Sequelize) {
     else if (i >= 2 && i <= 5) role = "hod";
     else role = "faculty";
 
-    const plainPassword = "passs123";
+    const plainPassword = "passs123@";
     const hashedPassword = await bcrypt.hash(plainPassword, 10);
 
     creds.push({

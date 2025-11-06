@@ -30,6 +30,14 @@ User.init(
     dept: { type: DataTypes.STRING, allowNull: false },
     phno: { type: DataTypes.STRING, allowNull: false },
     dateOfJoining: { type: DataTypes.DATEONLY, allowNull: false },
+    maritalStatus: {
+      type: DataTypes.ENUM("single", "married", "divorced", "widowed"),
+      defaultValue: "single",
+    },
+    isProbation: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: true,
+    },
   },
   {
     sequelize,
@@ -39,6 +47,5 @@ User.init(
     deletedAt: "deletedAt",
   }
 );
-
 
 export default User;

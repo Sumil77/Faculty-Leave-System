@@ -1,11 +1,12 @@
 import { useState, useEffect } from "react";
 import TypeOfLeaveImg from "../assets/Leaves.png";
 import { useSelector } from "react-redux";
+import * as leaveController from "../util/leave"; // ensure you have this import
 
 const ApplyLeave = () => {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({
-    leaveType: "",
+    leaveTypeId: "",
     fromDate: "",
     toDate: "",
     fraction: "full",
@@ -16,7 +17,7 @@ const ApplyLeave = () => {
   const [daysCount, setDaysCount] = useState(0);
   const [submittedLeave, setSubmittedLeave] = useState(null);
   const [isCancelEnabled, setIsCancelEnabled] = useState(false);
-  const leaveTypes = useSelector((state) => state.global.leaveTypes);
+  const leaveTypes = useSelector((state) => state.global.leaveTypes); // stored on login
 
   // Calculate total leave days for full-day leaves
   useEffect(() => {
@@ -34,22 +35,25 @@ const ApplyLeave = () => {
     }
   }, [form.fromDate, form.toDate, form.fraction]);
 
-  // Handle form input changes
+  // Handle input changes
   const handleChange = (e) => {
     const { name, value, files } = e.target;
     if (files) {
       setForm({ ...form, [name]: files[0] });
     } else {
-      setForm({ ...form, [name]: value });
+      setForm({
+        ...form,
+        [name]: name === "leaveTypeId" ? Number(value) : value,
+      });
     }
   };
 
   // Submit leave
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const { leaveType, fromDate, toDate, reason, fraction } = form;
+    const { leaveTypeId, fromDate, toDate, reason, fraction } = form;
 
-    if (!leaveType || !fromDate || !toDate || !reason) {
+    if (!leaveTypeId || !fromDate || !toDate || !reason) {
       alert("Please fill all mandatory fields!");
       return;
     }
@@ -64,7 +68,7 @@ const ApplyLeave = () => {
         time: new Date().toISOString(),
         from: fromDate,
         to: toDate,
-        type: leaveType,
+        leave_type_id: leaveTypeId,
         reason,
         fraction,
         attachment: form.attachment,
@@ -74,14 +78,22 @@ const ApplyLeave = () => {
 
       setSubmittedLeave({
         ...leave,
-        totalDays: fraction === "full" ? daysCount : fraction === "half" ? 0.5 : 0.25,
+        totalDays:
+          fraction === "full" ? daysCount : fraction === "half" ? 0.5 : 0.25,
       });
-
 
       setShowForm(false);
       setIsCancelEnabled(true);
       setTimeout(() => setIsCancelEnabled(false), 15 * 60 * 1000);
-      setForm({ leaveType: "", fromDate: "", toDate: "", fraction: "full", reason: "", attachment: null });
+
+      setForm({
+        leaveTypeId: "",
+        fromDate: "",
+        toDate: "",
+        fraction: "full",
+        reason: "",
+        attachment: null,
+      });
     } catch (err) {
       console.error(err);
       alert("Error applying leave. Please try again.");
@@ -91,6 +103,13 @@ const ApplyLeave = () => {
   const handleCancel = () => {
     setSubmittedLeave(null);
     setIsCancelEnabled(false);
+  };
+
+  const getLeaveName = (id) => {
+    const type = Object.values(leaveTypes).find(
+      (t) => t.leaveTypeId === id
+    );
+    return type ? type.fullName : "Unknown";
   };
 
   return (
@@ -110,8 +129,8 @@ const ApplyLeave = () => {
           disabled={!isCancelEnabled}
           onClick={handleCancel}
           className={`px-6 py-3 rounded-lg shadow ${isCancelEnabled
-            ? "bg-red-500 text-white hover:bg-red-600"
-            : "bg-gray-300 text-gray-700 cursor-not-allowed"
+              ? "bg-red-500 text-white hover:bg-red-600"
+              : "bg-gray-300 text-gray-700 cursor-not-allowed"
             }`}
         >
           Cancel Leave
@@ -139,21 +158,21 @@ const ApplyLeave = () => {
               Leave Type
             </label>
             <select
-              name="leaveType"
-              value={form.leaveType}
+              name="leaveTypeId"
+              value={form.leaveTypeId}
               onChange={handleChange}
               className="border rounded-lg p-3 w-full"
             >
               <option value="">Select Leave Type</option>
-              {Object.entries(leaveTypes).map(([key, val]) => (
-                <option key={key} value={key}>
-                  {val.fullName}
+              {Object.values(leaveTypes).map((type) => (
+                <option key={type.leaveTypeId} value={type.leaveTypeId}>
+                  {type.fullName}
                 </option>
               ))}
             </select>
           </div>
 
-          {/* Fraction */}
+          {/* Duration */}
           <div>
             <label className="block mb-2 font-semibold text-blue-800">
               Duration
@@ -229,7 +248,7 @@ const ApplyLeave = () => {
             />
           </div>
 
-          {/* File attachment (optional) */}
+          {/* Attachment */}
           <div>
             <label className="block mb-2 font-semibold text-blue-800">
               Attachment (optional)
@@ -254,15 +273,28 @@ const ApplyLeave = () => {
         </form>
       )}
 
+      {/* Submitted Leave */}
       {submittedLeave && (
         <div className="mt-8 bg-white p-6 rounded-xl shadow-md max-w-lg mx-auto space-y-3">
           <h3 className="text-xl font-bold text-blue-800">Leave Submitted ✅</h3>
-          <p><strong>Type:</strong> {submittedLeave.type}</p>
-          <p><strong>Duration:</strong> {submittedLeave.fraction}</p>
-          <p><strong>Reason:</strong> {submittedLeave.reason}</p>
-          <p><strong>From:</strong> {submittedLeave.from}</p>
-          <p><strong>To:</strong> {submittedLeave.to}</p>
-          <p><strong>Total:</strong> {submittedLeave.totalDays} day(s)</p>
+          <p>
+            <strong>Type:</strong> {getLeaveName(submittedLeave.leave_type_id)}
+          </p>
+          <p>
+            <strong>Duration:</strong> {submittedLeave.fraction}
+          </p>
+          <p>
+            <strong>Reason:</strong> {submittedLeave.reason}
+          </p>
+          <p>
+            <strong>From:</strong> {submittedLeave.from}
+          </p>
+          <p>
+            <strong>To:</strong> {submittedLeave.to}
+          </p>
+          <p>
+            <strong>Total:</strong> {submittedLeave.totalDays} day(s)
+          </p>
         </div>
       )}
     </div>
