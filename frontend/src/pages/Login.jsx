@@ -2,6 +2,8 @@ import React, { useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { login } from "../actions/session.js";
 import { fetchGlobals } from "../store/global.js";
+import { fetchProfile } from "../store/profile.js";
+import { useNavigate } from "react-router-dom";
 const departments = ["CSE", "IT", "ECE", "EEE"]; // Updated departments
 
 const generateCaptcha = () => {
@@ -19,6 +21,7 @@ const Login = () => {
   const [department, setDepartment] = useState("");
   const [captcha, setCaptcha] = useState(generateCaptcha());
   const [userCaptcha, setUserCaptcha] = useState("");
+  const navigate = useNavigate();
 
   const dispatch = useDispatch();
   const errors = useSelector((state) => state.errors); // Assuming errors are stored in state.errors
@@ -31,7 +34,8 @@ const Login = () => {
     try {
       const data = await dispatch(login(user));
       if (data?.user_id) {
-        await dispatch(fetchGlobals)
+        await dispatch(fetchGlobals());
+        await dispatch(fetchProfile());
         navigate("/dashboard"); // navigate only after successful login
       } else {
         setError("Invalid credentials");

@@ -1,3 +1,4 @@
+// AdminRequests_fixed_part1.jsx
 import React, { useState, useMemo, useEffect } from "react";
 import {
   FiCheckCircle,
@@ -24,11 +25,12 @@ export default function AdminRequests() {
     toDate: "",
     appliedFrom: "",
     appliedTo: "",
+    leaveType: undefined, // will hold leave_type_id (number) or undefined
   });
   const [page, setPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(5);
   const [totalPages, setTotalPages] = useState(1);
-  const [sortConfig, setSortConfig] = useState({ key: "from", direction: "asc" });
+  const [sortConfig, setSortConfig] = useState({ key: "fromDate", direction: "asc" });
   const [selectedIds, setSelectedIds] = useState([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [modalAction, setModalAction] = useState(null);
@@ -38,19 +40,37 @@ export default function AdminRequests() {
   // Instead of building depts dynamically from current page:
   const allDepartments = ["All", "CSE", "ECE", "ME", "CE"]; // or fetch from backend
   const [depts, setDepts] = useState(allDepartments);
-  const leaveTypes = useSelector((s) => s.global.leaveTypes);
 
+  // leaveTypes in redux is an object keyed by names: { casual: { leaveTypeId:1, acronym:'CL', ...}, ...}
+  const leaveTypes = useSelector((s) => s.global.leaveTypes || {});
+
+  // derived map: leave_type_id (number) -> leaveType object
+  const leaveTypeById = useMemo(() => {
+    const map = {};
+    Object.values(leaveTypes || {}).forEach((t) => {
+      if (t && typeof t.leaveTypeId !== "undefined") map[t.leaveTypeId] = t;
+    });
+    return map;
+  }, [leaveTypes]);
 
   // Debounce search input
   useEffect(() => {
-    const t = setTimeout(() => setFilters(f => ({ ...f, search: searchInput })), 300);
+    const t = setTimeout(() => setFilters((f) => ({ ...f, search: searchInput })), 300);
     return () => clearTimeout(t);
   }, [searchInput]);
 
   // Reset page when filters change
   useEffect(() => setPage(1), [filters, rowsPerPage]);
 
-  // Fetch requests from server
+  // helper to enrich incoming request rows with derived fields used by UI (leaveTypeAcronym)
+  const enrichRequests = (rows) => {
+    if (!Array.isArray(rows)) return [];
+    return rows.map((r) => {
+      const acronym = leaveTypeById[r.leave_type_id]?.acronym || "—";
+      return { ...r, _leaveTypeAcronym: acronym };
+    });
+  };
+
   // Fetch requests from server
   const loadRequests = async () => {
     try {
@@ -58,6 +78,7 @@ export default function AdminRequests() {
         search: filters.search || undefined,
         status: filters.status !== "All" ? filters.status : undefined,
         dept: filters.dept !== "All" ? filters.dept : undefined,
+        // backend expects leave_type_id - our API util uses 'leaveType' param name; we keep that but pass numeric id
         leaveType: filters.leaveType || undefined,
         from: filters.fromDate || undefined,
         to: filters.toDate || undefined,
@@ -70,28 +91,45 @@ export default function AdminRequests() {
       };
 
       const json = await adminController.getRequests(queryFilters);
-      setRequests(json.data || []);
-      setTotalPages(json.pagination?.totalPages || 1);
+      // if backend returns { data: [...], pagination: {...} }
+      const dataRows = json?.data || [];
+      const enriched = enrichRequests(dataRows);
+      setRequests(enriched);
+      // reset selection because page/filter changed and selection should be page-scoped
+      setSelectedIds([]);
+      setSelectedId(null);
+      setTotalPages(json?.pagination?.totalPages || 1);
     } catch (err) {
       console.error("Failed to fetch requests", err);
     }
   };
 
+  // re-enrich requests when leaveTypes mapping changes (so acronyms update)
+  useEffect(() => {
+    if (!requests.length) return;
+    setRequests((prev) => enrichRequests(prev));
+    // don't reset pagination or selectedIds here
+    // but we do clear selectedIds to avoid mismatches with updated types
+    setSelectedIds([]);
+  }, [leaveTypeById]); // eslint-disable-line
+
   // Whenever filters, page, rowsPerPage, or sortConfig changes, reload
   useEffect(() => {
     loadRequests();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters, page, rowsPerPage, sortConfig]);
 
   // Approve / Reject / Cancel actions
-  // Handle Approve / Reject actions
   const handleAction = async (actionType, ids) => {
     if (!ids || !ids.length) return;
     try {
-      // Only approve/reject for now
       if (actionType === "Approved") {
-        await adminController.handleAction("approve", ids);
+        await adminController.handleAction("approve", ids, { reason });
       } else if (actionType === "Rejected") {
-        await adminController.handleAction("reject", ids);
+        await adminController.handleAction("reject", ids, { reason });
+      } else if (actionType === "Cancelled") {
+        // if backend supports cancel; try use "cancel"
+        await adminController.handleAction("cancel", ids, { reason });
       }
 
       setModalOpen(false);
@@ -99,7 +137,8 @@ export default function AdminRequests() {
       setSelectedId(null);
       setReason("");
 
-      loadRequests();
+      // reload (fresh)
+      await loadRequests();
     } catch (err) {
       console.error(`${actionType} action failed`, err);
       alert(`Failed to ${actionType.toLowerCase()} leave(s).`);
@@ -108,13 +147,18 @@ export default function AdminRequests() {
 
   // Confirm action from modal
   const confirmAction = () => {
-    const idsToUpdate = selectedIds.length ? selectedIds : [selectedId];
-    handleAction(modalAction, idsToUpdate); // modify backend later to accept reason
+    const idsToUpdate = selectedIds.length ? selectedIds : selectedId ? [selectedId] : [];
+    if (!idsToUpdate.length) return;
+    handleAction(modalAction, idsToUpdate);
   };
 
   // Reset selection when status filter changes
-  useEffect(() => { setSelectedIds([]); }, [filters.status]);
+  useEffect(() => {
+    setSelectedIds([]);
+    setSelectedId(null);
+  }, [filters.status]);
 
+  // Column mapping for sort keys (use backend fields)
   const columnMap = {
     ID: "id",
     name: "name",
@@ -122,39 +166,43 @@ export default function AdminRequests() {
     from: "fromDate",
     to: "toDate",
     applied: "appliedOn",
-    LeaveType: "leaveType",
+    LeaveType: "leave_type_id",
     status: "status",
   };
 
   const requestSort = (key) => {
-    const columnMap = {
-      ID: "id",
-      name: "name",
-      "dept.": "dept",
-      from: "fromDate",
-      to: "toDate",
-      applied: "appliedOn",
-      LeaveType: "leaveType",
-      status: "status",
-    };
     const backendKey = columnMap[key] || key;
-    setSortConfig(prev => ({
+    setSortConfig((prev) => ({
       key: backendKey,
       direction: prev.key === backendKey && prev.direction === "asc" ? "desc" : "asc",
     }));
   };
 
-  // Export CSV using currently displayed requests
+  // Export CSV using currently displayed requests (correct fields)
   const exportCSV = () => {
-    const rows = [["ID", "Name", "Dept.", "From", "To", "Applied", "LeaveType", "Status"], ...requests.map(r => [r.id, r.name, r.dept, r.from, r.to, r.applied, r.reason, r.status])];
-    const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
+    const header = ["ID", "Name", "Dept.", "From", "To", "Applied", "LeaveType", "Status"];
+    const rows = requests.map((r) => {
+      const leaveType = r._leaveTypeAcronym || leaveTypeById[r.leave_type_id]?.acronym || "—";
+      return [
+        r.id,
+        r.name || r.user?.name || "",
+        r.dept || "",
+        r.fromDate || "",
+        r.toDate || "",
+        r.appliedOn || "",
+        leaveType,
+        r.status || "",
+      ];
+    });
+    const csvRows = [header, ...rows];
+    const csv = csvRows.map((r) => r.map((c) => `"${String(c ?? "").replace(/"/g, '""')}"`).join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a"); a.href = url; a.download = "leave_requests.csv"; a.click(); URL.revokeObjectURL(url);
   };
 
   const clearFilters = () => {
-    setFilters({ search: "", status: "All", dept: "All", fromDate: "", toDate: "", appliedFrom: "", appliedTo: "" });
+    setFilters({ search: "", status: "All", dept: "All", fromDate: "", toDate: "", appliedFrom: "", appliedTo: "", leaveType: undefined });
     setSearchInput("");
   };
 
@@ -238,7 +286,7 @@ export default function AdminRequests() {
               <FiDownload /> Export CSV
             </button>
             <button
-              onClick={() => setRequests((r) => [...r])}
+              onClick={loadRequests}
               className="p-2 bg-white border rounded shadow-sm"
               title="Refresh"
             >
@@ -296,19 +344,32 @@ export default function AdminRequests() {
             {/* Leave Type */}
             <div>
               <select
-                value={filters.leaveType || "All"}
-                onChange={(e) =>
-                  setFilters((f) => ({
-                    ...f,
-                    leaveType: e.target.value === "All" ? undefined : e.target.value,
-                  }))
-                }
+                value={(typeof filters.leaveType === "undefined") ? "All" : filters.leaveType}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  if (v === "All") {
+                    setFilters((f) => ({ ...f, leaveType: undefined }));
+                  } else {
+                    // v could be the key from Object.entries(leaveTypes) earlier; we will try to parse numeric id or lookup
+                    // if user selected an object key (like 'casual'), translate to its id
+                    const asNumber = Number(v);
+                    if (!Number.isNaN(asNumber) && asNumber > 0) {
+                      setFilters((f) => ({ ...f, leaveType: asNumber }));
+                    } else {
+                      // if v is a key in leaveTypes object, map to its id
+                      const mapped = leaveTypes?.[v]?.leaveTypeId;
+                      if (mapped) setFilters((f) => ({ ...f, leaveType: mapped }));
+                      else setFilters((f) => ({ ...f, leaveType: undefined }));
+                    }
+                  }
+                }}
                 className="w-full px-3 py-2 border rounded-lg shadow-sm"
               >
                 <option value="All">All Leave Types</option>
+                {/* show both numeric id and named keys so select value can be numeric id OR key (backwards compatible) */}
                 {Object.entries(leaveTypes).map(([key, val]) => (
-                  <option key={key} value={key}>
-                    {val.acronym} ({key})
+                  <option key={key} value={val?.leaveTypeId ?? key}>
+                    {val?.acronym} ({key})
                   </option>
                 ))}
               </select>
@@ -383,7 +444,6 @@ export default function AdminRequests() {
 
 
         {/* Table */}
-        {/* Table */}
         <div className="bg-white rounded-2xl shadow-md overflow-hidden">
           {requests.length > 0 ? (
             <div className="overflow-x-auto">
@@ -394,37 +454,23 @@ export default function AdminRequests() {
                       <input
                         type="checkbox"
                         disabled={filters.status === "All"}
-                        checked={selectedIds.length === requests.length && requests.length > 0}
+                        checked={requests.length > 0 && requests.every((r) => selectedIds.includes(r.id))}
                         onChange={(e) =>
                           setSelectedIds(e.target.checked ? requests.map((r) => r.id) : [])
                         }
                       />
                     </th>
 
-                    {["ID", "name", "dept.", "from", "to", "applied", "LeaveType", "status"].map((key, i) => (
+                    {["ID", "name", "dept.", "from", "to", "totalDays", "applied", "LeaveType", "status"].map((key, i) => (
                       <th
                         key={i}
                         onClick={() => {
-                          const columnMap = {
-                            ID: "id",
-                            name: "name",
-                            "dept.": "dept",
-                            from: "fromDate",
-                            to: "toDate",
-                            applied: "appliedOn",
-                            LeaveType: "leaveType",
-                            status: "status",
-                          };
-                          const backendKey = columnMap[key] || key;
-                          setSortConfig((prev) => ({
-                            key: backendKey,
-                            direction: prev.key === backendKey && prev.direction === "asc" ? "desc" : "asc",
-                          }));
+                          requestSort(key);
                         }}
                         className="px-4 py-4 font-semibold cursor-pointer select-none"
                       >
                         {key.charAt(0).toUpperCase() + key.slice(1)}
-                        {sortConfig.key === (key === "from" ? "fromDate" : key === "to" ? "toDate" : key === "applied" ? "appliedOn" : key) &&
+                        {sortConfig.key === (key === "from" ? "fromDate" : key === "to" ? "toDate" : key === "applied" ? "appliedOn" : (key === "LeaveType" ? "leave_type_id" : key)) &&
                           (sortConfig.direction === "asc" ? <FiChevronUp className="inline ml-1" /> : <FiChevronDown className="inline ml-1" />)}
                       </th>
                     ))}
@@ -450,11 +496,14 @@ export default function AdminRequests() {
                         />
                       </td>
 
-                      <td className="px-4 py-4 whitespace-nowrap">{req.user_id}</td>
+                      {/* ID (request id) */}
+                      <td className="px-4 py-4 whitespace-nowrap">{req.id}</td>
                       <td className="px-4 py-4 whitespace-nowrap">{req.name}</td>
                       <td className="px-4 py-4 whitespace-nowrap">{req.dept}</td>
                       <td className="px-4 py-4 whitespace-nowrap">{req.fromDate}</td>
                       <td className="px-4 py-4 whitespace-nowrap">{req.toDate}</td>
+                      <td className="px-4 py-4 whitespace-nowrap">{req.totalDays}</td>
+
                       <td className="px-4 py-4 whitespace-nowrap">
                         {req.appliedOn
                           ? new Date(req.appliedOn).toLocaleString("en-IN", {
@@ -468,8 +517,8 @@ export default function AdminRequests() {
                           : ""}
                       </td>
 
-                      <td className="px-4 py-4">
-                        {leaveTypes[req.leaveType]?.acronym || req.leaveType}
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        {req._leaveTypeAcronym || leaveTypeById[req.leave_type_id]?.acronym || "—"}
                       </td>
 
                       <td className="px-4 py-4">

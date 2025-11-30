@@ -41,8 +41,9 @@ export default function SummaryTable({ leaves }) {
             <td className="p-2 border">{l.dept}</td>
             {leaveTypeKeys.map((key) => (
               <td key={key} className="p-2 border text-center">
-                {l[key] ?? '-'}
+                {typeof l[key] === "object" && l[key] !== null ? "-" : l[key] ?? "-"}
               </td>
+
             ))}
             <td className="p-2 border text-center">{l.Total ?? '-'}</td>
           </tr>

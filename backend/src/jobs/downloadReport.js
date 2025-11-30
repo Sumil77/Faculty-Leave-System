@@ -28,7 +28,7 @@ process.on("message", async (data) => {
     let buffer;
     if (type === "summary") {
       if (format === "csv") buffer = await generateCSV(reportData);
-      if (format === "excel") buffer = await generateExcel(reportData);
+      if (format === "excel") buffer = await generateExcel(filters, reportData);
       if (format === "pdf") buffer = await generatePDF(filters, reportData);
     } else {
       if (format === "csv") buffer = await generateHistoryCSV(reportData);

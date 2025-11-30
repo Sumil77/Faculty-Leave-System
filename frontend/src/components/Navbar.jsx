@@ -1,7 +1,22 @@
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { useSelector, useDispatch } from "react-redux";
+import { logout } from "../actions/session";
 import msitLogo from "../assets/msit.png";
 
 const Navbar = () => {
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
+
+  // Read user from Redux session slice
+  const currentUser = useSelector((state) => state.session);
+  console.log("currentUser" , currentUser);
+  
+
+  const handleLogout = async () => {
+    await dispatch(logout());
+    navigate("/login");
+  };
+
   return (
     <header>
       {/* Top Section with Logo & Heading */}
@@ -13,15 +28,17 @@ const Navbar = () => {
             className="h-16 w-auto ml-4 cursor-pointer"
           />
         </Link>
+
         <div className="text-center">
           <h1 className="text-2xl font-bold text-red-700">
             MAHARAJA SURAJMAL INSTITUTE OF TECHNOLOGY
           </h1>
           <p className="text-orange-600 text-sm">
             Affiliated to GGSIPU | NAAC Accredited 'A' Grade | NBA (CSE, IT,
-            ECE,EEE) | Approved by AICTE | ISO 9001:2015 Certified
+            ECE, EEE) | Approved by AICTE | ISO 9001:2015 Certified
           </p>
         </div>
+
         <div className="mr-4">
           <p className="text-gray-700 font-medium text-sm">
             An initiative by MSIT for seamless faculty services.
@@ -47,9 +64,20 @@ const Navbar = () => {
           <Link to="/contact" className="text-white hover:underline">
             Contact Us
           </Link>
-          <Link to="/login" className="text-white hover:underline">
-            Login
-          </Link>
+
+          {/* Login → Logout Toggle */}
+          {!currentUser ? (
+            <Link to="/login" className="text-white hover:underline">
+              Login
+            </Link>
+          ) : (
+            <button
+              onClick={handleLogout}
+              className="text-white hover:underline"
+            >
+              Logout
+            </button>
+          )}
         </div>
       </nav>
     </header>

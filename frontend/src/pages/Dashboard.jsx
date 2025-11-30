@@ -54,11 +54,13 @@ const Dashboard = () => {
   const [leaveBalances, setLeaveBalance] = useState([]);
   const [sortAsc, setSortAsc] = useState(true);
   const { leaveTypes, departments } = useSelector((s) => s.global);
+  const user = useSelector((state) => state.profile.data);
 
   useEffect(() => {
     const fetchAll = async () => {
       try {
-        const user = await userController.getUser();
+        console.log(user);
+
         setFacultyData(user);
 
         const leaveBalanceData = await leaveController.getLeaveBalance();
@@ -70,9 +72,8 @@ const Dashboard = () => {
         console.error(err);
       }
     };
-
-    fetchAll();
-  }, []);
+    if (user)  fetchAll();
+  }, [user]);
 
 
   const getFilteredLeaves = () => {
@@ -168,7 +169,7 @@ const Dashboard = () => {
                 {filteredLeaves.map((leave, index) => (
                   <tr key={index} className="hover:bg-gray-100">
                     <td className="p-3 border-b">{formatDate(leave.fromDate)}</td>
-                    <td className="p-3 border-b">{leaveTypes[leave.leaveType]?.fullName|| "Unknown"}</td>
+                    <td className="p-3 border-b">{leaveTypes[leave.leaveType]?.fullName || "Unknown"}</td>
                     <td className={`p-3 border-b ${getStatusColor(leave.status)}`}>
                       {leave.status}
                     </td>
@@ -209,7 +210,7 @@ const Dashboard = () => {
             >
               <div className="flex items-center space-x-3">
                 <div className="text-xl text-gray-700">{leaveIcons[leaveType]}</div>
-                <span className="text-lg font-semibold text-gray-800">{leaveTypes[leaveType].fullName}: </span>
+                <span className="text-lg font-semibold text-gray-800">{leaveTypes[leaveType].acronym}: </span>
               </div>
               <span className="text-lg font-semibold text-gray-900">{balance}</span>
             </div>

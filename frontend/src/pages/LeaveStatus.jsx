@@ -77,7 +77,7 @@ const LeaveStatus = () => {
     const type = Object.values(leaveTypes).find(
       (t) => t.leaveTypeId === id
     );
-    return type ? type.fullName : "Unknown";
+    return type ? type.acronym : "Unknown";
   };
 
   return (
@@ -169,8 +169,8 @@ const LeaveStatus = () => {
       {statusFilter === "Pending" && (
         <button
           className={`mb-4 p-2 px-4 rounded ${selectedLeaves.length > 0
-              ? "bg-red-500 hover:bg-red-600 text-white"
-              : "bg-gray-400 cursor-not-allowed"
+            ? "bg-red-500 hover:bg-red-600 text-white"
+            : "bg-gray-400 cursor-not-allowed"
             }`}
           disabled={selectedLeaves.length === 0}
           onClick={handleCancelSelected}
@@ -239,25 +239,30 @@ const LeaveStatus = () => {
       </div>
 
       {/* Pagination */}
-      <div className="flex justify-between items-center mt-6">
-        <button
-          className="p-2 px-4 bg-blue-500 text-white rounded disabled:opacity-50"
-          disabled={currentPage === 1}
-          onClick={() => setCurrentPage((prev) => prev - 1)}
-        >
-          Prev
-        </button>
-        <span>
-          Page {currentPage} of {totalPages}
-        </span>
-        <button
-          className="p-2 px-4 bg-blue-500 text-white rounded disabled:opacity-50"
-          disabled={currentPage === totalPages}
-          onClick={() => setCurrentPage((prev) => prev + 1)}
-        >
-          Next
-        </button>
-      </div>
+      {leaves.length > 0 && (
+        <div className="flex justify-between items-center mt-6">
+          <button
+            className="p-2 px-4 bg-blue-500 text-white rounded disabled:opacity-50"
+            disabled={currentPage === 1}
+            onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+          >
+            Prev
+          </button>
+          <span>
+            Page {currentPage} of {totalPages || 1}
+          </span>
+          <button
+            className="p-2 px-4 bg-blue-500 text-white rounded disabled:opacity-50"
+            disabled={currentPage === (totalPages || 1)}
+            onClick={() =>
+              setCurrentPage((prev) => Math.min(prev + 1, totalPages || 1))
+            }
+          >
+            Next
+          </button>
+        </div>
+      )}
+
     </div>
   );
 };

@@ -5,6 +5,7 @@ import AppRoutes from "./routes/AppRoutes";
 import { useDispatch, useSelector } from "react-redux";
 import { useEffect } from "react";
 import { fetchGlobals } from "./store/global.js";
+import { fetchProfile } from "./store/profile.js";
 
 
 function App() {
@@ -12,6 +13,7 @@ function App() {
   const lastFetched = useSelector((s) => s.global.lastFetched);
 
   useEffect(() => {
+    dispatch(fetchProfile());
     const now = Date.now();
     if (!lastFetched || now - lastFetched > 30 * 60 * 1000) {
       dispatch(fetchGlobals());

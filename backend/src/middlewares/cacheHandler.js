@@ -83,7 +83,13 @@ export const cacheHandler = async (req, res, next) => {
   try {
     if (req.method !== "GET") return next();
 
-    const key = req.originalUrl;
+    const sortedQuery = Object.keys(req.query)
+      .sort()
+      .map((k) => `${k}=${req.query[k]}`)
+      .join("&");
+
+    const key = sortedQuery ? `${req.path}?${sortedQuery}` : req.path;
+
     const cachedData = await redis.get(key);
 
     if (cachedData) {

@@ -32,8 +32,10 @@ export const login = async (req, res) => {
     }
     const user = await Credentials.findOne({ where: { email } });
     if (user && user.comparePasswords(password)) {
-      const sessionUser = sessionizeUser(user);
-      req.session.user = sessionUser;
+      const sessionUser = await sessionizeUser(user);
+      req.session.user =  sessionUser;
+      console.log(sessionUser);
+      
       res.send(sessionUser);
     } else {
       throw new Error("Invalid login credentials");

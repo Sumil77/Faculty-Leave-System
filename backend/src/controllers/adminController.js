@@ -50,7 +50,7 @@ export const getRequests = async (req, res) => {
       "fromDate",
       "toDate",
       "totalDays",
-      "leaveType",
+      "leave_type_id",
       "dept",
       "createdAt",
       "updatedAt",
@@ -72,7 +72,7 @@ export const getRequests = async (req, res) => {
       const where = {};
 
       if (dept !== "All") where.dept = dept;
-      if (leaveType && leaveType !== "All") where.leaveType = leaveType;
+      if (leaveType && leaveType !== "All") where.leave_type_id = leaveType;
       if (fromDate && toDate)
         where.fromDate = { [Op.between]: [fromDate, toDate] };
       else if (fromDate) where.fromDate = { [Op.gte]: fromDate };
@@ -87,16 +87,14 @@ export const getRequests = async (req, res) => {
         const n = Number(search);
         where[Op.or] = [
           !isNaN(n) ? { user_id: n } : null,
-          { leaveType: { [Op.iLike]: `%${search}%` } },
+          { leave_type_id: { [Op.iLike]: `%${search}%` } },
           { "$user.name$": { [Op.iLike]: `%${search}%` } },
         ].filter(Boolean);
       }
 
       const { rows, count } = await Model.findAndCountAll({
         where,
-        include: [
-          { model: User, as: "user", attributes: ["name"] },
-        ],
+        include: [{ model: User, as: "user", attributes: ["name"] }],
         limit: limitNum,
         offset,
         order: [[sortColumn, sortDirection]],
@@ -122,15 +120,15 @@ export const getRequests = async (req, res) => {
     // === "All" status ===
     const baseUnion = `
       SELECT la.id, la.user_id, u.name, la."appliedOn", la."fromDate", la."toDate",
-             la."totalDays", la."leaveType", la.dept, la."createdAt", 'Approved' as status
+             la."totalDays", la."leave_type_id", la.dept, la."createdAt", 'Approved' as status
       FROM "LeaveApproved" la JOIN "User" u ON la.user_id = u.user_id
       UNION ALL
       SELECT lr.id, lr.user_id, u.name, lr."appliedOn", lr."fromDate", lr."toDate",
-             lr."totalDays", lr."leaveType", lr.dept, lr."createdAt", 'Rejected' as status
+             lr."totalDays", lr."leave_type_id", lr.dept, lr."createdAt", 'Rejected' as status
       FROM "LeaveRejected" lr JOIN "User" u ON lr.user_id = u.user_id
       UNION ALL
       SELECT lp.id, lp.user_id, u.name, lp."appliedOn", lp."fromDate", lp."toDate",
-             lp."totalDays", lp."leaveType", lp.dept, lp."createdAt", 'Pending' as status
+             lp."totalDays", lp."leave_type_id", lp.dept, lp."createdAt", 'Pending' as status
       FROM "LeavePending" lp JOIN "User" u ON lp.user_id = u.user_id
     `;
 
@@ -143,15 +141,21 @@ export const getRequests = async (req, res) => {
       replacements.dept = dept;
     }
     if (leaveType && leaveType !== "All") {
-      unionWhereClauses.push(`"leaveType" = :leaveType`);
+      unionWhereClauses.push(`"leave_type_id" = :leaveType`);
       replacements.leaveType = leaveType;
     }
+
     if (search) {
-      unionWhereClauses.push(
-        `(CAST(user_id AS TEXT) ILIKE :search OR name ILIKE :search OR "leaveType" ILIKE :search)`
-      );
+      unionWhereClauses.push(`
+    (
+      CAST(user_id AS TEXT) ILIKE :search OR 
+      name ILIKE :search OR
+      CAST("leave_type_id" AS TEXT) ILIKE :search
+    )
+  `);
       replacements.search = `%${search}%`;
     }
+
     if (fromDate && toDate) {
       unionWhereClauses.push(`"fromDate" BETWEEN :fromDate AND :toDate`);
       replacements.fromDate = fromDate;

@@ -26,6 +26,25 @@ export default function AdminLeaves() {
     const [originalLeaveRules, setOriginalLeaveRules] = useState([]);
     const [originalCreditRules, setOriginalCreditRules] = useState([]);
 
+    const parseInputValue = (field, value) => {
+        try {
+            // Try parsing JSON for object fields
+            if (["bonus_credit_on_occasion", "penalty_rule"].includes(field)) {
+                return JSON.parse(value);
+            }
+        } catch (err) {
+            return value; // fallback if invalid JSON
+        }
+
+        // Handle booleans
+        if (value === "true") return true;
+        if (value === "false") return false;
+
+        // Handle numbers
+        if (!isNaN(value) && value !== "") return Number(value);
+
+        return value;
+    };
 
 
 
@@ -217,34 +236,78 @@ export default function AdminLeaves() {
                                         Save
                                     </button>
                                 </div>
-                                {Object.entries(rule).map(([field, value]) =>
-                                    ["id", "leave_type_id", "createdAt", "updatedAt"].includes(
-                                        field
-                                    ) ? null : (
+
+                                {Object.entries(rule).map(([field, value]) => {
+                                    if (["id", "leave_type_id", "createdAt", "updatedAt"].includes(field)) return null;
+
+                                    // Boolean field → checkbox
+                                    if (typeof value === "boolean") {
+                                        return (
+                                            <div key={field} className="mt-1 flex items-center gap-2">
+                                                <label className="w-48 text-sm text-gray-700">{field}</label>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={value}
+                                                    onChange={(e) =>
+                                                        handleRuleChange(
+                                                            leaveRules,
+                                                            setLeaveRules,
+                                                            rule.id,
+                                                            field,
+                                                            e.target.checked
+                                                        )
+                                                    }
+                                                />
+                                            </div>
+                                        );
+                                    }
+
+                                    // Object field → display JSON read-only
+                                    if (typeof value === "object" && value !== null) {
+                                        return (
+                                            <div key={field} className="mt-1 flex items-start gap-2">
+                                                <label className="w-48 text-sm text-gray-700">{field}</label>
+                                                <div className="border p-1 rounded w-64 bg-gray-100 text-xs overflow-auto">
+                                                    {JSON.stringify(value)}
+                                                </div>
+                                            </div>
+                                        );
+                                    }
+
+                                    // Number or string → text input
+                                    return (
                                         <div key={field} className="mt-1 flex items-center gap-2">
-                                            <label className="w-48 text-sm text-gray-700">
-                                                {field}
-                                            </label>
+                                            <label className="w-48 text-sm text-gray-700">{field}</label>
                                             <input
+                                                type="text"
                                                 className="border p-1 rounded w-64"
                                                 value={value ?? ""}
-                                                onChange={(e) =>
+                                                onChange={(e) => {
+                                                    const val = e.target.value;
+                                                    let parsedVal;
+
+                                                    // Try number conversion
+                                                    if (!isNaN(val) && val !== "") parsedVal = Number(val);
+                                                    else parsedVal = val;
+
                                                     handleRuleChange(
                                                         leaveRules,
                                                         setLeaveRules,
                                                         rule.id,
                                                         field,
-                                                        e.target.value
-                                                    )
-                                                }
+                                                        parsedVal
+                                                    );
+                                                }}
                                             />
                                         </div>
-                                    )
-                                )}
+                                    );
+                                })}
                             </div>
                         ))}
                     </div>
 
+
+                    {/* Credit Rules */}
                     {/* Credit Rules */}
                     <div className="border p-4 rounded-xl">
                         <h4 className="font-semibold mb-2">Credit Rules</h4>
@@ -262,33 +325,76 @@ export default function AdminLeaves() {
                                         Save
                                     </button>
                                 </div>
-                                {Object.entries(rule).map(([field, value]) =>
-                                    ["id", "leave_type_id", "createdAt", "updatedAt"].includes(
-                                        field
-                                    ) ? null : (
+
+                                {Object.entries(rule).map(([field, value]) => {
+                                    if (["id", "leave_type_id", "createdAt", "updatedAt"].includes(field)) return null;
+
+                                    // Boolean field
+                                    if (typeof value === "boolean") {
+                                        return (
+                                            <div key={field} className="mt-1 flex items-center gap-2">
+                                                <label className="w-48 text-sm text-gray-700">{field}</label>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={value}
+                                                    onChange={(e) =>
+                                                        handleRuleChange(
+                                                            creditRules,
+                                                            setCreditRules,
+                                                            rule.id,
+                                                            field,
+                                                            e.target.checked
+                                                        )
+                                                    }
+                                                />
+                                            </div>
+                                        );
+                                    }
+
+                                    // Object field → display JSON read-only
+                                    if (typeof value === "object" && value !== null) {
+                                        return (
+                                            <div key={field} className="mt-1 flex items-start gap-2">
+                                                <label className="w-48 text-sm text-gray-700">{field}</label>
+                                                <div className="border p-1 rounded w-64 bg-gray-100 text-xs overflow-auto">
+                                                    {JSON.stringify(value)}
+                                                </div>
+                                            </div>
+                                        );
+                                    }
+
+                                    // Number or string
+                                    return (
                                         <div key={field} className="mt-1 flex items-center gap-2">
-                                            <label className="w-48 text-sm text-gray-700">
-                                                {field}
-                                            </label>
+                                            <label className="w-48 text-sm text-gray-700">{field}</label>
                                             <input
+                                                type="text"
                                                 className="border p-1 rounded w-64"
                                                 value={value ?? ""}
-                                                onChange={(e) =>
+                                                onChange={(e) => {
+                                                    const val = e.target.value;
+                                                    let parsedVal;
+
+                                                    // Try number conversion
+                                                    if (!isNaN(val) && val !== "") parsedVal = Number(val);
+                                                    else parsedVal = val;
+
                                                     handleRuleChange(
                                                         creditRules,
                                                         setCreditRules,
                                                         rule.id,
                                                         field,
-                                                        e.target.type === "number" ? Number(e.target.value) : e.target.value
-                                                    )
-                                                }
+                                                        parsedVal
+                                                    );
+                                                }}
                                             />
                                         </div>
-                                    )
-                                )}
+                                    );
+                                })}
                             </div>
                         ))}
                     </div>
+
                 </div>
             )}
         </div>

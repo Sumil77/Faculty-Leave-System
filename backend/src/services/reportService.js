@@ -126,16 +126,28 @@ export async function getHistoryForMail(filters = {}) {
 export async function generateHistoryCSV(data) {
   if (!data || data.length === 0) return Buffer.from("");
 
-  const rows = data.map((leave) => [
-    leave.user_id,
-    leave.name,
-    leave.dept,
-    formatDate(leave.appliedOn),
-    formatDate(leave.fromDate),
-    formatDate(leave.toDate),
-    leave.leaveType,
-    leave.totalDays,
-  ]);
+  const leaveTypes = await getLeaveTypes(); // same as PDF
+  const ltMap = new Map(
+    leaveTypes.map((lt) => [lt.name.toLowerCase().trim(), lt.acronym])
+  );
+
+  const rows = data.flatMap((user) =>
+    (user.leaves || []).map((leave) => {
+      const ltKey = (leave.leaveType || "").toLowerCase().trim();
+      const acronym = ltMap.get(ltKey) || leave.leaveType || "-";
+
+      return [
+        user.user_id,
+        user.name,
+        user.dept,
+        formatDate(leave.appliedOn),
+        formatDate(leave.fromDate),
+        formatDate(leave.toDate),
+        acronym,
+        leave.totalDays ?? "-",
+      ];
+    })
+  );
 
   const headers = [
     "UID",
@@ -161,40 +173,43 @@ export async function generateHistoryExcel(data) {
     return await workbook.xlsx.writeBuffer();
   }
 
-  const headerMap = {
-    user_id: "User ID",
-    name: "Name",
-    dept: "Dept",
-    appliedOn: "Applied On",
-    fromDate: "From Date",
-    toDate: "To Date",
-    leaveType: "Leave Type",
-    totalDays: "Total Days",
-  };
+  const leaveTypes = await getLeaveTypes();
+  const ltMap = new Map(
+    leaveTypes.map((lt) => [lt.name.toLowerCase().trim(), lt.acronym])
+  );
 
-  const rows = data.map((leave) => ({
-    user_id: leave.user_id,
-    name: leave.name,
-    dept: leave.dept,
-    appliedOn: formatDate(leave.appliedOn),
-    fromDate: formatDate(leave.fromDate),
-    toDate: formatDate(leave.toDate),
-    leaveType: leave.leaveType,
-    totalDays: leave.totalDays,
-  }));
+  const rows = data.flatMap((user) =>
+    (user.leaves || []).map((leave) => {
+      const ltKey = (leave.leaveType || "").toLowerCase().trim();
+      const acronym = ltMap.get(ltKey) || leave.leaveType || "-";
 
-  const columns = Object.keys(rows[0]).map((key) => ({
-    header: headerMap[key] || key,
-    key,
-    width:
-      Math.max(
-        headerMap[key]?.length || key.length,
-        ...rows.map((row) => String(row[key] ?? "").length)
-      ) + 2,
-  }));
+      return {
+        uid: user.user_id,
+        name: user.name,
+        dept: user.dept,
+        appliedOn: formatDate(leave.appliedOn),
+        fromDate: formatDate(leave.fromDate),
+        toDate: formatDate(leave.toDate),
+        leaveType: acronym,
+        totalDays: leave.totalDays ?? "-",
+      };
+    })
+  );
+
+  const columns = [
+    { header: "UID", key: "uid", width: 10 },
+    { header: "Name", key: "name", width: 20 },
+    { header: "Dept", key: "dept", width: 10 },
+    { header: "Applied On", key: "appliedOn", width: 15 },
+    { header: "From", key: "fromDate", width: 15 },
+    { header: "To", key: "toDate", width: 15 },
+    { header: "Leave Type", key: "leaveType", width: 12 },
+    { header: "Days", key: "totalDays", width: 10 },
+  ];
 
   worksheet.columns = columns;
-  worksheet.addRows(rows);
+
+  rows.forEach((row) => worksheet.addRow(row));
 
   return await workbook.xlsx.writeBuffer();
 }
@@ -501,57 +516,99 @@ export async function generateCSV(data) {
   }
 }
 
-export async function generateExcel(data) {
-  try {
-    // 🩵 Normalize leave types into a key-value map { acronym: { name, acronym } }
-    const rawLeaveTypes = await getLeaveTypes();
-    const leaveTypes = Array.isArray(rawLeaveTypes)
-      ? Object.fromEntries(rawLeaveTypes.map((t) => [t.acronym, t]))
-      : rawLeaveTypes;
+export async function generateExcel(filters, rawData) {
+  const leaveTypes = await getLeaveTypes();
+  const leaveTypeList = Object.values(leaveTypes);
 
-    const leaveTypeKeys = Object.keys(leaveTypes);
+  // Extract data and analytics like PDF
+  const data = Array.isArray(rawData?.rows) ? rawData.rows : rawData || [];
+  const analytics = rawData?.analytics || {};
 
-    data = Array.isArray(data) ? data : data?.rows || [];
+  if (!data.length) throw new Error("No data available for Excel generation.");
 
-    const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet("Leave Summary");
+  const workbook = new ExcelJS.Workbook();
+  const worksheet = workbook.addWorksheet("Leave Summary");
 
-    if (!data.length) return await workbook.xlsx.writeBuffer();
+  // -----------------------------
+  // 1️⃣ Title and timestamp
+  // -----------------------------
+  let rowIndex = 1;
 
-    const columns = [
-      { key: "user_id", label: "UID" },
-      { key: "name", label: "Name" },
-      { key: "dept", label: "Dept" },
-      ...leaveTypeKeys.map((key) => ({ key, label: leaveTypes[key].acronym })),
-    ];
+  worksheet.mergeCells(`A${rowIndex}:Z${rowIndex}`);
+  worksheet.getCell(`A${rowIndex}`).value = "Leave Summary Report";
+  worksheet.getCell(`A${rowIndex}`).font = { bold: true, size: 16 };
+  worksheet.getCell(`A${rowIndex}`).alignment = { horizontal: "center" };
+  rowIndex++;
 
-    worksheet.columns = columns.map((col) => ({
-      header: col.label,
-      key: col.key,
-      width: col.label.length + 2,
-    }));
+  worksheet.mergeCells(`A${rowIndex}:Z${rowIndex}`);
+  worksheet.getCell(
+    `A${rowIndex}`
+  ).value = `Generated on ${new Date().toLocaleString("en-IN", {
+    timeZone: "Asia/Kolkata",
+  })}`;
+  worksheet.getCell(`A${rowIndex}`).alignment = { horizontal: "center" };
+  rowIndex++;
 
-    data.forEach((row) => {
-      const rowData = {};
-      columns.forEach((col) => (rowData[col.key] = safeValue(row, col.key)));
-      worksheet.addRow(rowData);
+  worksheet.mergeCells(`A${rowIndex}:Z${rowIndex}`);
+  worksheet.getCell(`A${rowIndex}`).value = `Filters applied: Dept = ${
+    filters.dept || "All"
+  }, Date Range = ${filters.from || "-"} to ${filters.to || "-"}`;
+  worksheet.getCell(`A${rowIndex}`).alignment = { horizontal: "center" };
+  rowIndex += 2;
+
+  // -----------------------------
+  // 2️⃣ Table headers
+  // -----------------------------
+  const dynamicKeys = Object.keys(data[0]).filter(
+    (k) => !["user_id", "name", "dept", "totalDays"].includes(k)
+  );
+
+  const headers = [
+    { label: "UID", property: "user_id" },
+    { label: "Name", property: "name" },
+    { label: "Dept.", property: "dept" },
+    ...dynamicKeys.map((key) => ({
+      label: leaveTypeList.find((lt) => lt.acronym === key)?.acronym || key,
+      property: key,
+    })),
+  ];
+
+  worksheet.addRow(headers.map((h) => h.label));
+  rowIndex++;
+
+  // -----------------------------
+  // 3️⃣ Table rows
+  // -----------------------------
+  for (const row of data) {
+    const formatted = headers.map((h) => {
+      const val = row[h.property];
+      if (val === null || val === undefined) return "-";
+      if (typeof val === "number") return val.toString();
+      return String(val);
     });
-
-    // Auto width adjustment
-    worksheet.columns.forEach((column) => {
-      let maxLength = column.header.length;
-      column.eachCell({ includeEmpty: true }, (cell) => {
-        const len = String(cell.value ?? "").length;
-        if (len > maxLength) maxLength = len;
-      });
-      column.width = maxLength + 2;
-    });
-
-    return await workbook.xlsx.writeBuffer();
-  } catch (err) {
-    console.error("Error generating Excel:", err);
-    throw new Error("Failed to generate Excel report.");
+    worksheet.addRow(formatted);
+    rowIndex++;
   }
+
+  // -----------------------------
+  // 4️⃣ Analytics summary
+  // -----------------------------
+  rowIndex++;
+  worksheet.addRow([]);
+  worksheet.addRow(["Analytics Summary"]);
+  rowIndex++;
+
+  Object.entries(analytics.leavetypetotals || {}).forEach(([type, total]) => {
+    worksheet.addRow([`${type}: ${total}`]);
+    rowIndex++;
+  });
+
+  if (analytics.grandtotal !== undefined) {
+    worksheet.addRow([`Grand Total Leaves Taken: ${analytics.grandtotal}`]);
+    rowIndex++;
+  }
+
+  return await workbook.xlsx.writeBuffer();
 }
 
 export async function generatePDF(filters, rawData) {
@@ -737,14 +794,15 @@ export async function generateAndSendReport(email, filters) {
 
   try {
     const summaryData = await getSummaryForMail(filters);
+    console.log(summaryData);
 
     if (!summaryData || summaryData.length === 0) {
       console.warn("No data to generate report for", email);
     }
 
     const [pdfBuffer, excelBuffer, csvBuffer] = await Promise.all([
-      generatePDF(summaryData),
-      generateExcel(summaryData),
+      generatePDF(filters, summaryData),
+      generateExcel(filters, summaryData),
       generateCSV(summaryData),
     ]);
 

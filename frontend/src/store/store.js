@@ -1,9 +1,11 @@
-// store.js
 import { configureStore } from "@reduxjs/toolkit";
-import reducer from "../reducers/root.js";
+import rootReducer from "../reducers/root.js";
+import profileReducer from "./profile.js";
+import globalReducer from "./global.js";
 
-export default preloadedState =>
-  configureStore({
-    reducer,
+export default function configure(preloadedState) {
+  return configureStore({
+    reducer: rootReducer,
     preloadedState,
   });
+}
